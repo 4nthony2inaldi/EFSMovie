@@ -322,16 +322,20 @@ export default function LeagueMoviesPage() {
     }
   }
 
-  async function refreshBoxOffice(movie: Movie) {
+  async function refreshBoxOffice(movie: Movie, useBrowser = false) {
     setRefreshingIds((prev) => new Set(prev).add(movie.id));
 
     try {
-      const response = await fetch('/api/boxoffice/refresh', {
+      // Use browser-based scraper if requested (for theater counts)
+      const endpoint = useBrowser ? '/api/boxoffice/scrape-browser' : '/api/boxoffice/refresh';
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           movieId: movie.id,
           tmdbId: movie.tmdb_id,
+          imdbId: movie.imdb_id,
           title: movie.title,
           releaseYear: movie.release_year,
         }),
@@ -343,6 +347,9 @@ export default function LeagueMoviesPage() {
         alert(`Failed to refresh ${movie.title}: ${data.error}`);
       } else {
         await loadMovies();
+        if (useBrowser && data.data?.theater_count) {
+          alert(`Got theater count: ${data.data.theater_count.toLocaleString()} theaters`);
+        }
       }
     } catch (error) {
       console.error('Refresh error:', error);
@@ -810,13 +817,21 @@ export default function LeagueMoviesPage() {
                         onClick={() => refreshBoxOffice(movie)}
                         disabled={refreshingIds.has(movie.id)}
                         className="p-2 text-gray-400 hover:text-green-600 disabled:opacity-50"
-                        title="Refresh box office data"
+                        title="Quick refresh (box office + metacritic)"
                       >
                         {refreshingIds.has(movie.id) ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
                           <RefreshCw className="h-4 w-4" />
                         )}
+                      </button>
+                      <button
+                        onClick={() => refreshBoxOffice(movie, true)}
+                        disabled={refreshingIds.has(movie.id) || !movie.imdb_id}
+                        className="p-2 text-gray-400 hover:text-blue-600 disabled:opacity-50"
+                        title="Deep scrape with browser (gets theater count)"
+                      >
+                        <Download className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => startEdit(movie)}
