@@ -21,6 +21,11 @@ export default async function DashboardLayout({
     .eq('user_id', user.id)
     .single();
 
+  // If no team, redirect to onboarding
+  if (!team) {
+    redirect('/onboarding');
+  }
+
   // Check if user is a commissioner
   const { data: commissionerLeague } = await supabase
     .from('leagues')

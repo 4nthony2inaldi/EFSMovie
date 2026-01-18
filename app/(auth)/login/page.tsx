@@ -30,6 +30,23 @@ export default function LoginPage() {
       return;
     }
 
+    // Check if user has a team (completed onboarding)
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: team } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!team) {
+        // No team yet, need to complete onboarding
+        router.push('/onboarding');
+        router.refresh();
+        return;
+      }
+    }
+
     router.push('/standings');
     router.refresh();
   }
