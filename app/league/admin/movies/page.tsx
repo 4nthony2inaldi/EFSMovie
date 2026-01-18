@@ -97,7 +97,11 @@ export default function LeagueMoviesPage() {
     setTmdbLoading(true);
     setTmdbError(null);
     try {
-      const response = await fetch(`/api/tmdb/upcoming?year=${tmdbYear}&month=${tmdbMonth}`);
+      // Add cache-busting timestamp to bypass Vercel edge cache
+      const cacheBuster = Date.now();
+      const response = await fetch(`/api/tmdb/upcoming?year=${tmdbYear}&month=${tmdbMonth}&_t=${cacheBuster}`, {
+        cache: 'no-store',
+      });
       const data = await response.json();
       if (data.error) {
         setTmdbError(data.error);
