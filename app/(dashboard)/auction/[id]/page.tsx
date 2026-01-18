@@ -26,11 +26,11 @@ import {
 export default function AuctionDetailPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [auctionId, setAuctionId] = useState<string | null>(null);
+  const auctionId = params.id;
   const [auction, setAuction] = useState<Auction | null>(null);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [bids, setBids] = useState<Map<string, number>>(new Map());
@@ -39,15 +39,8 @@ export default function AuctionDetailPage({
   const [saving, setSaving] = useState<Set<string>>(new Set());
   const [results, setResults] = useState<any[] | null>(null);
 
-  // Unwrap params
-  useEffect(() => {
-    params.then((p) => setAuctionId(p.id));
-  }, [params]);
-
   // Load auction data
   useEffect(() => {
-    if (!auctionId) return;
-
     async function loadData() {
       setLoading(true);
 
