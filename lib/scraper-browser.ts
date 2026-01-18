@@ -42,11 +42,13 @@ export async function scrapeBoxOfficeMojoBrowser(imdbId: string): Promise<Browse
 
   try {
     // Configure chromium for serverless environment
+    const executablePath = await chromium.executablePath();
+
     browser = await puppeteer.launch({
       args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+      defaultViewport: { width: 1280, height: 720 },
+      executablePath,
+      headless: true,
     });
 
     const page = await browser.newPage();
@@ -63,7 +65,7 @@ export async function scrapeBoxOfficeMojoBrowser(imdbId: string): Promise<Browse
     });
 
     // Wait a bit for any dynamic content
-    await page.waitForTimeout(2000);
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Extract the page text content
     const pageText = await page.evaluate(() => document.body.innerText);
