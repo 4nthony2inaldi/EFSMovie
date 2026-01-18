@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
       try {
         const details = await tmdb.getMovieDetails(tmdbId);
         // TMDB returns external_ids in the response when appended
-        const externalIds = (details as Record<string, unknown>).external_ids as { imdb_id?: string } | undefined;
-        imdbId = externalIds?.imdb_id || details.imdb_id || null;
+        const detailsAny = details as unknown as { external_ids?: { imdb_id?: string }; imdb_id?: string };
+        imdbId = detailsAny.external_ids?.imdb_id || detailsAny.imdb_id || null;
       } catch (e) {
         console.error('Failed to get IMDB ID from TMDB:', e);
       }
@@ -131,8 +131,8 @@ export async function PUT(request: NextRequest) {
         // Get IMDB ID if we don't have it
         if (!imdbId && movie.tmdb_id) {
           const details = await tmdb.getMovieDetails(movie.tmdb_id);
-          const externalIds = (details as Record<string, unknown>).external_ids as { imdb_id?: string } | undefined;
-          imdbId = externalIds?.imdb_id || details.imdb_id || null;
+          const detailsAny = details as unknown as { external_ids?: { imdb_id?: string }; imdb_id?: string };
+          imdbId = detailsAny.external_ids?.imdb_id || detailsAny.imdb_id || null;
         }
 
         if (!imdbId) {
