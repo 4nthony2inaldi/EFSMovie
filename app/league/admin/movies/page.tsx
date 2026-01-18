@@ -223,25 +223,23 @@ export default function LeagueMoviesPage() {
     if (!confirm(`Are you sure you want to delete ALL ${count} movies? This cannot be undone.`)) return;
 
     setBulkDeleting(true);
-    let deleted = 0;
-    let errors: string[] = [];
 
-    for (const movie of movies) {
-      const { error } = await supabase.from('movies').delete().eq('id', movie.id);
-      if (error) {
-        console.error(`Failed to delete ${movie.title}:`, error);
-        errors.push(`${movie.title}: ${error.message}`);
-      } else {
-        deleted++;
-      }
-    }
-
-    if (errors.length > 0) {
-      alert(`Deleted ${deleted}/${count} movies.\n\nErrors:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? `\n...and ${errors.length - 3} more` : ''}`);
-    }
+    // Try batch delete first
+    const movieIds = movies.map(m => m.id);
+    const { error, count: deletedCount } = await supabase
+      .from('movies')
+      .delete()
+      .in('id', movieIds)
+      .select('*', { count: 'exact', head: true });
 
     await loadMovies();
     setBulkDeleting(false);
+
+    if (error) {
+      alert(`Delete failed: ${error.message}`);
+    } else {
+      alert(`Delete operation completed. Refresh the page to see results.`);
+    }
   }
 
   async function importAllTMDBMovies() {
