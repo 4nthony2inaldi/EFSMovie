@@ -104,7 +104,9 @@ export default function LeagueMoviesPage() {
       });
       const data = await response.json();
       if (data.error) {
-        setTmdbError(data.error);
+        // Include debug info if available
+        const debugInfo = data.debug ? ` [Debug: envVars=${JSON.stringify(data.debug.relevantEnvVars)}]` : '';
+        setTmdbError(data.error + debugInfo);
         setTmdbMovies([]);
       } else {
         setTmdbMovies(data.movies || []);

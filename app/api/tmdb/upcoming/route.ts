@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TMDBClient } from '@/lib/tmdb';
 
-// Disable caching for this route
+// Force Node.js runtime (not Edge) and disable all caching
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 // Get API key at runtime - use NEXT_PUBLIC_ prefix to ensure Vercel passes it
 function getApiKey(): string {
