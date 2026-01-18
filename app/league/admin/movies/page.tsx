@@ -55,6 +55,8 @@ export default function LeagueMoviesPage() {
   const [tmdbYear, setTmdbYear] = useState(new Date().getFullYear());
   const [importingIds, setImportingIds] = useState<Set<number>>(new Set());
   const [importedIds, setImportedIds] = useState<Set<number>>(new Set());
+  const [bulkImporting, setBulkImporting] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -216,6 +218,80 @@ export default function LeagueMoviesPage() {
     loadMovies();
   }
 
+  async function handleDeleteAll() {
+    const count = movies.length;
+    if (!confirm(`Are you sure you want to delete ALL ${count} movies? This cannot be undone.`)) return;
+
+    setBulkDeleting(true);
+    try {
+      // Delete all movies
+      const { error } = await supabase.from('movies').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      if (error) throw error;
+      loadMovies();
+    } catch (error) {
+      console.error('Failed to delete movies:', error);
+      alert('Failed to delete movies');
+    }
+    setBulkDeleting(false);
+  }
+
+  async function importAllTMDBMovies() {
+    const moviesToImport = tmdbMovies.filter(m => !importedIds.has(m.tmdb_id));
+    if (moviesToImport.length === 0) {
+      alert('All movies are already imported!');
+      return;
+    }
+
+    if (!confirm(`Import all ${moviesToImport.length} movies?`)) return;
+
+    setBulkImporting(true);
+
+    for (const tmdbMovie of moviesToImport) {
+      try {
+        setImportingIds((prev) => new Set(prev).add(tmdbMovie.tmdb_id));
+
+        // Parse release date
+        const releaseDate = new Date(tmdbMovie.release_date);
+        const releaseMonth = releaseDate.getMonth() + 1;
+        const releaseYear = releaseDate.getFullYear();
+
+        // Fetch full details
+        const detailsResponse = await fetch(`/api/tmdb/movie/${tmdbMovie.tmdb_id}`);
+        const details = await detailsResponse.json();
+
+        // Insert into database
+        await supabase.from('movies').insert({
+          title: tmdbMovie.title,
+          tmdb_id: tmdbMovie.tmdb_id,
+          release_date: tmdbMovie.release_date,
+          release_month: releaseMonth,
+          release_year: releaseYear,
+          poster_url: tmdbMovie.poster_url,
+          backdrop_url: tmdbMovie.backdrop_url,
+          genre: tmdbMovie.genre,
+          synopsis: details.synopsis || tmdbMovie.overview,
+          runtime_minutes: details.runtime_minutes,
+          director: details.director,
+          cast_list: details.cast_list,
+          trailer_url: details.trailer_url,
+        });
+
+        setImportedIds((prev) => new Set(prev).add(tmdbMovie.tmdb_id));
+      } catch (error) {
+        console.error(`Failed to import ${tmdbMovie.title}:`, error);
+      }
+
+      setImportingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(tmdbMovie.tmdb_id);
+        return next;
+      });
+    }
+
+    setBulkImporting(false);
+    loadMovies();
+  }
+
   const filteredMovies = movies.filter((movie) => {
     const matchesSearch = movie.title.toLowerCase().includes(search.toLowerCase());
     const matchesMonth = filterMonth === '' || movie.release_month === filterMonth;
@@ -307,6 +383,32 @@ export default function LeagueMoviesPage() {
                 Load Movies
               </button>
             </div>
+
+            {/* Import All Button */}
+            {tmdbMovies.length > 0 && !tmdbLoading && !tmdbError && (
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg flex items-center justify-between">
+                <span className="text-sm text-blue-700">
+                  {tmdbMovies.filter(m => !importedIds.has(m.tmdb_id)).length} movies available to import
+                </span>
+                <button
+                  onClick={importAllTMDBMovies}
+                  disabled={bulkImporting}
+                  className="btn-primary py-1.5 px-4 text-sm flex items-center gap-2"
+                >
+                  {bulkImporting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="h-4 w-4" />
+                      Import All
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
             {tmdbLoading ? (
               <div className="py-12 text-center">
@@ -409,6 +511,20 @@ export default function LeagueMoviesPage() {
             <option key={i} value={i + 1}>{month}</option>
           ))}
         </select>
+        {movies.length > 0 && (
+          <button
+            onClick={handleDeleteAll}
+            disabled={bulkDeleting}
+            className="btn-danger flex items-center gap-2"
+          >
+            {bulkDeleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            Delete All
+          </button>
+        )}
       </div>
 
       {/* Add/Edit Form */}
