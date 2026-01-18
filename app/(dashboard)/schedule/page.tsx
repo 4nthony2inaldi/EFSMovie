@@ -106,8 +106,9 @@ export default async function SchedulePage({
 
   const ownershipMap = new Map<string, string>();
   (teamMovies || []).forEach((tm) => {
-    if (tm.team && team?.league_id && tm.team.league_id === team.league_id) {
-      ownershipMap.set(tm.movie_id, tm.team.name);
+    const tmTeam = tm.team as unknown as { id: string; name: string; league_id: string } | null;
+    if (tmTeam && team?.league_id && tmTeam.league_id === team.league_id) {
+      ownershipMap.set(tm.movie_id, tmTeam.name);
     }
   });
 
