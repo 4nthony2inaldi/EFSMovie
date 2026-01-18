@@ -224,21 +224,18 @@ export default function LeagueMoviesPage() {
 
     setBulkDeleting(true);
 
-    // Try batch delete first
+    // Delete all movies by their IDs
     const movieIds = movies.map(m => m.id);
-    const { error, count: deletedCount } = await supabase
+    const { error } = await supabase
       .from('movies')
       .delete()
-      .in('id', movieIds)
-      .select('*', { count: 'exact', head: true });
+      .in('id', movieIds);
 
     await loadMovies();
     setBulkDeleting(false);
 
     if (error) {
       alert(`Delete failed: ${error.message}`);
-    } else {
-      alert(`Delete operation completed. Refresh the page to see results.`);
     }
   }
 
