@@ -3,10 +3,10 @@ import { createClient } from '@supabase/supabase-js';
 import { scrapeBoxOfficeMojoBrowser } from '@/lib/scraper-browser';
 import { tmdb } from '@/lib/tmdb';
 
-// Force Node.js runtime for Puppeteer
+// Force Node.js runtime
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60; // Allow up to 60 seconds for browser scraping
+export const maxDuration = 30; // Allow up to 30 seconds for multi-source scraping
 
 // Create admin Supabase client (bypasses RLS)
 function getSupabaseAdmin() {
@@ -17,7 +17,7 @@ function getSupabaseAdmin() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { movieId, tmdbId, imdbId: providedImdbId } = await request.json();
+    const { movieId, tmdbId, imdbId: providedImdbId, title, releaseYear } = await request.json();
 
     if (!movieId) {
       return NextResponse.json({ error: 'Movie ID is required' }, { status: 400 });
@@ -38,20 +38,21 @@ export async function POST(request: NextRequest) {
 
     if (!imdbId) {
       return NextResponse.json({
-        error: 'IMDB ID is required for browser scraping',
-        suggestion: 'Add IMDB ID to the movie first',
+        error: 'IMDB ID is required for deep scraping',
+        suggestion: 'Add IMDB ID to the movie first via quick refresh',
       }, { status: 400 });
     }
 
-    console.log(`Starting browser scrape for ${imdbId}...`);
+    console.log(`Starting enhanced scrape for ${imdbId} (${title} ${releaseYear})...`);
 
-    // Use browser-based scraper
-    const data = await scrapeBoxOfficeMojoBrowser(imdbId);
+    // Use multi-source scraper with title/year for fallback sources
+    const data = await scrapeBoxOfficeMojoBrowser(imdbId, title, releaseYear);
 
     if (!data) {
       return NextResponse.json({
-        error: 'Failed to scrape data with browser',
+        error: 'Failed to scrape data from any source',
         imdbId,
+        triedSources: ['Box Office Mojo', 'The Numbers'],
       }, { status: 500 });
     }
 
