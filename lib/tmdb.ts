@@ -93,16 +93,25 @@ class TMDBClient {
   async discoverByReleaseDates(
     startDate: string,
     endDate: string,
-    page = 1
+    page = 1,
+    options: { restrictReleaseType?: boolean } = {}
   ): Promise<TMDBResponse<TMDBMovie>> {
-    return this.fetch<TMDBResponse<TMDBMovie>>('/discover/movie', {
+    const params: Record<string, string> = {
       page: page.toString(),
-      region: 'US',
-      'release_date.gte': startDate,
-      'release_date.lte': endDate,
-      with_release_type: '2|3', // Theatrical releases
+      'primary_release_date.gte': startDate,
+      'primary_release_date.lte': endDate,
       sort_by: 'popularity.desc',
-    });
+      'vote_count.gte': '0',
+      with_original_language: 'en',
+    };
+
+    // Only restrict to theatrical for past/current releases
+    if (options.restrictReleaseType) {
+      params.with_release_type = '2|3';
+      params.region = 'US';
+    }
+
+    return this.fetch<TMDBResponse<TMDBMovie>>('/discover/movie', params);
   }
 
   // Get movies releasing in a specific month
@@ -111,13 +120,20 @@ class TMDBClient {
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${month.toString().padStart(2, '0')}-${lastDay}`;
 
+    // Check if this is a past date (restrict to theatrical releases) or future (be more permissive)
+    const today = new Date();
+    const targetDate = new Date(year, month - 1, 1);
+    const isPast = targetDate < today;
+
     const allMovies: TMDBMovie[] = [];
     let page = 1;
     let totalPages = 1;
 
     // Fetch up to 3 pages (60 movies max per month)
     while (page <= Math.min(totalPages, 3)) {
-      const response = await this.discoverByReleaseDates(startDate, endDate, page);
+      const response = await this.discoverByReleaseDates(startDate, endDate, page, {
+        restrictReleaseType: isPast,
+      });
       allMovies.push(...response.results);
       totalPages = response.total_pages;
       page++;

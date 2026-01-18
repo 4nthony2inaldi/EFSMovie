@@ -6,6 +6,15 @@ export async function GET(request: NextRequest) {
   const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString());
   const month = parseInt(searchParams.get('month') || (new Date().getMonth() + 1).toString());
 
+  // Check if API key is configured
+  if (!process.env.TMDB_API_KEY) {
+    console.error('TMDB_API_KEY environment variable is not set');
+    return NextResponse.json(
+      { error: 'TMDB API is not configured. Please add TMDB_API_KEY to environment variables.' },
+      { status: 500 }
+    );
+  }
+
   try {
     const movies = await tmdb.getMoviesByMonth(year, month);
 
@@ -29,8 +38,9 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('TMDB API error:', error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to fetch movies from TMDB' },
+      { error: `Failed to fetch movies from TMDB: ${message}` },
       { status: 500 }
     );
   }
