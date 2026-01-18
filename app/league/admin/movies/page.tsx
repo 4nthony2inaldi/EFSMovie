@@ -376,36 +376,61 @@ export default function LeagueMoviesPage() {
       return;
     }
 
-    if (!confirm(`Refresh all data (box office, theaters, metacritic) for ${moviesToRefresh.length} movies?\n\nThis uses the yearly stats page for theater counts and may take a few minutes.`)) {
+    if (!confirm(`Refresh all data (box office, theaters, metacritic) for ${moviesToRefresh.length} movies?\n\nThis processes each movie individually to avoid timeouts.`)) {
       return;
     }
 
     setBulkRefreshing(true);
 
-    try {
-      // Use the deep scraper endpoint which gets theaters from yearly chart + metacritic
-      const response = await fetch('/api/boxoffice/scrape-browser', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          movieIds: moviesToRefresh.map(m => m.id),
-        }),
-      });
+    let successCount = 0;
+    let failCount = 0;
+    const errors: string[] = [];
 
-      const data = await response.json();
+    // Process movies one at a time from the client to avoid serverless timeouts
+    for (const movie of moviesToRefresh) {
+      try {
+        setRefreshingIds((prev) => new Set(prev).add(movie.id));
 
-      if (response.ok) {
-        await loadMovies();
-        alert(`Full refresh complete!\n\n✓ ${data.success} movies updated\n✗ ${data.failed} failed${data.errors?.length ? '\n\nErrors:\n' + data.errors.slice(0, 5).join('\n') : ''}`);
-      } else {
-        alert(`Refresh failed: ${data.error}`);
+        const releaseDate = movie.release_month && movie.release_year
+          ? `${movie.release_year}-${String(movie.release_month).padStart(2, '0')}-15`
+          : undefined;
+
+        const response = await fetch('/api/boxoffice/scrape-browser', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            movieId: movie.id,
+            tmdbId: movie.tmdb_id,
+            imdbId: movie.imdb_id,
+            title: movie.title,
+            releaseYear: movie.release_year,
+            releaseDate,
+          }),
+        });
+
+        if (response.ok) {
+          successCount++;
+        } else {
+          const data = await response.json();
+          failCount++;
+          errors.push(`${movie.title}: ${data.error}`);
+        }
+      } catch (error) {
+        failCount++;
+        errors.push(`${movie.title}: Network error`);
       }
-    } catch (error) {
-      console.error('Bulk refresh error:', error);
-      alert('Failed to refresh data');
+
+      setRefreshingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(movie.id);
+        return next;
+      });
     }
 
+    await loadMovies();
     setBulkRefreshing(false);
+
+    alert(`Full refresh complete!\n\n✓ ${successCount} movies updated\n✗ ${failCount} failed${errors.length ? '\n\nErrors:\n' + errors.slice(0, 5).join('\n') : ''}`);
   }
 
   const filteredMovies = movies.filter((movie) => {
