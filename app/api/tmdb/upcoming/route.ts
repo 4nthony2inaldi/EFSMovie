@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TMDBClient } from '@/lib/tmdb';
 
-// Get API key at runtime
+// Get API key at runtime - use NEXT_PUBLIC_ prefix to ensure Vercel passes it
 function getApiKey(): string {
-  return process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY || '';
+  return process.env.NEXT_PUBLIC_TMDB_API_KEY || process.env.TMDB_API_KEY || '';
 }
 
 export async function GET(request: NextRequest) {
