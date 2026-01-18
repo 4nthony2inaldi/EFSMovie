@@ -1,0 +1,111 @@
+import type { ScoreBreakdown } from '@/types';
+
+export interface MovieStats {
+  domesticBoxOffice: number;
+  theaterCount: number;
+  metacriticScore: number | null;
+  oscarNominations: number;
+  oscarWins: number;
+  bestPictureNominated: boolean;
+  bestPictureWon: boolean;
+}
+
+/**
+ * Calculate the full score breakdown for a movie
+ *
+ * Formula:
+ * - Box Office Component = min(15, (Domestic Box Office / Theater Count) / 1000)
+ * - Must be in 5+ theaters to earn box office points
+ * - Base Score = Box Office Component × Metacritic Score
+ * - Floor Rule: If Base Score < Metacritic, use Metacritic as minimum
+ * - Oscar Points: +0.5 per nom, +1.0 per win
+ * - Best Picture nom: doubled (+1.0 total instead of +0.5)
+ * - Best Picture win: doubled (+2.0 total instead of +1.0)
+ */
+export function calculateMovieScore(stats: MovieStats): ScoreBreakdown {
+  const {
+    domesticBoxOffice,
+    theaterCount,
+    metacriticScore,
+    oscarNominations,
+    oscarWins,
+    bestPictureNominated,
+    bestPictureWon,
+  } = stats;
+
+  const metacritic = metacriticScore ?? 0;
+
+  // Box office component (must be in 5+ theaters)
+  let boxOfficeComponent = 0;
+  if (theaterCount >= 5) {
+    boxOfficeComponent = Math.min((domesticBoxOffice / theaterCount) / 1000, 15);
+  }
+
+  // Raw base score
+  const rawBaseScore = boxOfficeComponent * metacritic;
+
+  // Floor rule: minimum is metacritic score
+  const floorApplied = rawBaseScore < metacritic;
+  const baseScore = floorApplied ? metacritic : rawBaseScore;
+
+  // Oscar points
+  const oscarNomPoints = oscarNominations * 0.5;
+  const oscarWinPoints = oscarWins * 1.0;
+  const bestPictureNomBonus = bestPictureNominated ? 0.5 : 0;
+  const bestPictureWinBonus = bestPictureWon ? 1.0 : 0;
+  const totalOscarPoints = oscarNomPoints + oscarWinPoints + bestPictureNomBonus + bestPictureWinBonus;
+
+  // Final score
+  const finalScore = Math.round((baseScore + totalOscarPoints) * 100) / 100;
+
+  return {
+    boxOfficeComponent: Math.round(boxOfficeComponent * 1000) / 1000,
+    metacriticScore: metacritic,
+    rawBaseScore: Math.round(rawBaseScore * 100) / 100,
+    floorApplied,
+    baseScore: Math.round(baseScore * 100) / 100,
+    oscarNomPoints,
+    oscarWinPoints,
+    bestPictureNomBonus,
+    bestPictureWinBonus,
+    totalOscarPoints,
+    finalScore,
+  };
+}
+
+/**
+ * Simple version that just returns the final score
+ */
+export function getMovieScore(stats: MovieStats): number {
+  return calculateMovieScore(stats).finalScore;
+}
+
+/**
+ * Format score for display
+ */
+export function formatScore(score: number): string {
+  return score.toFixed(2);
+}
+
+/**
+ * Format box office for display
+ */
+export function formatBoxOffice(amount: number): string {
+  if (amount >= 1_000_000_000) {
+    return `$${(amount / 1_000_000_000).toFixed(2)}B`;
+  }
+  if (amount >= 1_000_000) {
+    return `$${(amount / 1_000_000).toFixed(1)}M`;
+  }
+  if (amount >= 1_000) {
+    return `$${(amount / 1_000).toFixed(1)}K`;
+  }
+  return `$${amount.toFixed(0)}`;
+}
+
+/**
+ * Format theater count for display
+ */
+export function formatTheaters(count: number): string {
+  return count.toLocaleString();
+}
