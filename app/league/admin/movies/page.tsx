@@ -223,16 +223,24 @@ export default function LeagueMoviesPage() {
     if (!confirm(`Are you sure you want to delete ALL ${count} movies? This cannot be undone.`)) return;
 
     setBulkDeleting(true);
-    try {
-      // Delete movies one by one to ensure RLS works
-      for (const movie of movies) {
-        await supabase.from('movies').delete().eq('id', movie.id);
+    let deleted = 0;
+    let errors: string[] = [];
+
+    for (const movie of movies) {
+      const { error } = await supabase.from('movies').delete().eq('id', movie.id);
+      if (error) {
+        console.error(`Failed to delete ${movie.title}:`, error);
+        errors.push(`${movie.title}: ${error.message}`);
+      } else {
+        deleted++;
       }
-      await loadMovies();
-    } catch (error) {
-      console.error('Failed to delete movies:', error);
-      alert('Failed to delete movies');
     }
+
+    if (errors.length > 0) {
+      alert(`Deleted ${deleted}/${count} movies.\n\nErrors:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? `\n...and ${errors.length - 3} more` : ''}`);
+    }
+
+    await loadMovies();
     setBulkDeleting(false);
   }
 
