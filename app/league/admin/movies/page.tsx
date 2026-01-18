@@ -215,7 +215,7 @@ export default function LeagueMoviesPage() {
       release_year: movie.release_year,
       poster_url: movie.poster_url || '',
       domestic_box_office: movie.domestic_box_office || 0,
-      theater_count: 0,
+      theater_count: movie.theater_count || 0,
       metacritic_score: movie.metacritic_score?.toString() || '',
     });
     setEditingId(movie.id);
