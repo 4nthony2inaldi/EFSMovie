@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
-import { Gavel, Loader2, Plus, Pencil, Trash2, Film, Clock, CheckCircle, PlayCircle } from 'lucide-react';
+import { Gavel, Loader2, Plus, Pencil, Trash2, Film, Clock, CheckCircle, PlayCircle, RefreshCw } from 'lucide-react';
 
 interface Auction {
   id: string;
@@ -164,7 +164,31 @@ export default function LeagueAuctionsPage() {
   }
 
   async function handleStatusChange(id: string, newStatus: string) {
-    await supabase.from('auctions').update({ status: newStatus }).eq('id', id);
+    // If resolving, call the resolve API which processes bids and assigns winners
+    if (newStatus === 'resolved') {
+      if (!confirm('Resolve this auction? This will process all bids and assign movies to winning teams.')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/auctions/${id}/resolve`, {
+          method: 'POST',
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(`Failed to resolve: ${data.error}`);
+          return;
+        }
+
+        alert(`Auction resolved! ${data.assignments} movies assigned to teams.`);
+      } catch (error) {
+        alert('Failed to resolve auction');
+        return;
+      }
+    } else {
+      await supabase.from('auctions').update({ status: newStatus }).eq('id', id);
+    }
     loadData();
   }
 
@@ -356,10 +380,20 @@ export default function LeagueAuctionsPage() {
                       >
                         <option value="upcoming">Upcoming</option>
                         <option value="open">Open</option>
+                        <option value="closed">Closed</option>
                         <option value="resolved">Resolved</option>
                       </select>
                     </td>
-                    <td className="p-4 text-right">
+                    <td className="p-4 text-right flex items-center justify-end gap-1">
+                      {auction.status === 'resolved' && (
+                        <button
+                          onClick={() => handleStatusChange(auction.id, 'resolved')}
+                          className="p-2 text-gray-400 hover:text-green-600"
+                          title="Re-resolve auction"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => startEdit(auction)}
                         className="p-2 text-gray-400 hover:text-purple-600"
