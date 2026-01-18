@@ -50,6 +50,7 @@ export default function LeagueMoviesPage() {
   // TMDB state
   const [tmdbMovies, setTmdbMovies] = useState<TMDBMovie[]>([]);
   const [tmdbLoading, setTmdbLoading] = useState(false);
+  const [tmdbError, setTmdbError] = useState<string | null>(null);
   const [tmdbMonth, setTmdbMonth] = useState(new Date().getMonth() + 1);
   const [tmdbYear, setTmdbYear] = useState(new Date().getFullYear());
   const [importingIds, setImportingIds] = useState<Set<number>>(new Set());
@@ -92,12 +93,19 @@ export default function LeagueMoviesPage() {
 
   async function loadTMDBMovies() {
     setTmdbLoading(true);
+    setTmdbError(null);
     try {
       const response = await fetch(`/api/tmdb/upcoming?year=${tmdbYear}&month=${tmdbMonth}`);
       const data = await response.json();
-      setTmdbMovies(data.movies || []);
+      if (data.error) {
+        setTmdbError(data.error);
+        setTmdbMovies([]);
+      } else {
+        setTmdbMovies(data.movies || []);
+      }
     } catch (error) {
       console.error('Failed to load TMDB movies:', error);
+      setTmdbError('Network error - failed to connect to TMDB');
     }
     setTmdbLoading(false);
   }
@@ -304,6 +312,14 @@ export default function LeagueMoviesPage() {
               <div className="py-12 text-center">
                 <Loader2 className="h-8 w-8 text-purple-600 animate-spin mx-auto mb-2" />
                 <p className="text-gray-500">Loading movies from TMDB...</p>
+              </div>
+            ) : tmdbError ? (
+              <div className="py-12 text-center">
+                <div className="text-red-500 mb-2">
+                  <X className="h-12 w-12 mx-auto mb-2" />
+                </div>
+                <p className="text-red-600 font-medium">Error loading movies</p>
+                <p className="text-sm text-red-500 mt-1">{tmdbError}</p>
               </div>
             ) : tmdbMovies.length === 0 ? (
               <div className="py-12 text-center text-gray-500">
