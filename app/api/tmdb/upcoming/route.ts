@@ -1,29 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { tmdb, TMDBClient } from '@/lib/tmdb';
+import { TMDBClient } from '@/lib/tmdb';
+
+// Get API key at runtime
+function getApiKey(): string {
+  return process.env.TMDB_API_KEY || process.env.NEXT_PUBLIC_TMDB_API_KEY || '';
+}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString());
   const month = parseInt(searchParams.get('month') || (new Date().getMonth() + 1).toString());
 
-  // Debug: check env var
-  const apiKey = process.env.TMDB_API_KEY;
-  const hasKey = !!apiKey;
-  const keyLength = apiKey?.length || 0;
+  // Get API key at runtime
+  const apiKey = getApiKey();
+
+  // Debug info
+  const envKeys = Object.keys(process.env).filter(k =>
+    k.includes('TMDB') || k.includes('tmdb') || k.includes('SUPABASE')
+  );
 
   // Check if API key is configured
   if (!apiKey) {
-    console.error('TMDB_API_KEY environment variable is not set');
     return NextResponse.json(
       {
         error: 'TMDB API is not configured. Please add TMDB_API_KEY to environment variables.',
-        debug: { hasKey, keyLength, nodeEnv: process.env.NODE_ENV }
+        debug: {
+          hasKey: false,
+          keyLength: 0,
+          nodeEnv: process.env.NODE_ENV,
+          relevantEnvVars: envKeys,
+          allEnvCount: Object.keys(process.env).length
+        }
       },
       { status: 500 }
     );
   }
 
   try {
+    // Create client with API key at request time
+    const tmdb = new TMDBClient(apiKey);
     const movies = await tmdb.getMoviesByMonth(year, month);
 
     // Transform to a simpler format

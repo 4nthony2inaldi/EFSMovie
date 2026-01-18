@@ -61,8 +61,8 @@ class TMDBClient {
   private apiKey: string;
   private isBearerToken: boolean;
 
-  constructor() {
-    this.apiKey = process.env.TMDB_API_KEY || '';
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey || process.env.TMDB_API_KEY || '';
     // Detect if it's a bearer token (JWT) or API key
     this.isBearerToken = this.apiKey.startsWith('eyJ');
   }
