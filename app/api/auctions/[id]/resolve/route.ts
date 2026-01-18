@@ -33,7 +33,7 @@ export async function POST(
 
   // If already resolved, allow re-resolution by clearing old assignments
   if (auction.status === 'resolved') {
-    const { createClient: createAdminClient } = await import('@/lib/supabase/admin');
+    const { createAdminClient } = await import('@/lib/supabase/admin');
     const adminSupabase = createAdminClient();
 
     // Get old assignments to refund budgets
