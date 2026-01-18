@@ -83,14 +83,16 @@ export function getMovieScore(stats: MovieStats): number {
 /**
  * Format score for display
  */
-export function formatScore(score: number): string {
+export function formatScore(score: number | null | undefined): string {
+  if (score == null) return '0.00';
   return score.toFixed(2);
 }
 
 /**
  * Format box office for display
  */
-export function formatBoxOffice(amount: number): string {
+export function formatBoxOffice(amount: number | null | undefined): string {
+  if (amount == null || amount === 0) return '-';
   if (amount >= 1_000_000_000) {
     return `$${(amount / 1_000_000_000).toFixed(2)}B`;
   }
@@ -106,6 +108,7 @@ export function formatBoxOffice(amount: number): string {
 /**
  * Format theater count for display
  */
-export function formatTheaters(count: number): string {
+export function formatTheaters(count: number | null | undefined): string {
+  if (count == null) return '-';
   return count.toLocaleString();
 }
