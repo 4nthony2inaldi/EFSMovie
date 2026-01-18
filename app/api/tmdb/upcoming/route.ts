@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TMDBClient } from '@/lib/tmdb';
 
+// Disable caching for this route
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 // Get API key at runtime - use NEXT_PUBLIC_ prefix to ensure Vercel passes it
 function getApiKey(): string {
   return process.env.NEXT_PUBLIC_TMDB_API_KEY || process.env.TMDB_API_KEY || '';
@@ -32,7 +36,10 @@ export async function GET(request: NextRequest) {
           allEnvCount: Object.keys(process.env).length
         }
       },
-      { status: 500 }
+      {
+        status: 500,
+        headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
+      }
     );
   }
 
