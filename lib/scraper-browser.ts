@@ -1,6 +1,6 @@
 /**
  * Alternative scraper for Box Office Mojo
- * Uses daily chart pages which have theater counts in static HTML
+ * Uses yearly stats page which has theater counts in static HTML
  * Falls back to The Numbers and OMDB for additional data
  */
 
@@ -41,17 +41,17 @@ function normalizeTitle(title: string): string {
 }
 
 /**
- * Fetch and parse a single BOM daily chart page
+ * Scrape BOM yearly stats page for theater counts
+ * The yearly page has all movies with theater counts in static HTML!
+ * URL: https://www.boxofficemojo.com/year/{year}/
  */
-async function fetchDailyChartPage(
-  dateStr: string,
-  normalizedTitle: string,
-  title: string
-): Promise<{ theaters: number; boxOffice: number }> {
-  try {
-    const url = `https://www.boxofficemojo.com/date/${dateStr}/`;
-    console.log(`Fetching BOM daily chart: ${url}`);
+async function scrapeBOMYearlyChart(title: string, year: number): Promise<{ theaters: number | null; boxOffice: number | null }> {
+  const normalizedTitle = normalizeTitle(title);
+  const url = `https://www.boxofficemojo.com/year/${year}/`;
 
+  console.log(`Fetching BOM yearly chart: ${url}`);
+
+  try {
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -60,19 +60,19 @@ async function fetchDailyChartPage(
     });
 
     if (!response.ok) {
-      console.log(`BOM daily chart ${dateStr} returned ${response.status}`);
-      return { theaters: 0, boxOffice: 0 };
+      console.log(`BOM yearly chart returned ${response.status}`);
+      return { theaters: null, boxOffice: null };
     }
 
     const html = await response.text();
-    let theaters = 0;
-    let boxOffice = 0;
+    console.log(`BOM yearly chart HTML length: ${html.length}`);
 
     // Split into table rows
     const rows = html.split(/<tr[^>]*>/i);
 
     for (const row of rows) {
       // Check if this row contains our movie title
+      // BOM yearly page uses /release/ links for movie titles
       const titleMatch = row.match(/<a[^>]*href="\/release\/[^"]*"[^>]*>([^<]+)<\/a>/i);
       if (!titleMatch) continue;
 
@@ -80,88 +80,51 @@ async function fetchDailyChartPage(
 
       // Check if titles match (allow partial match for longer titles)
       if (rowTitle.includes(normalizedTitle) || normalizedTitle.includes(rowTitle)) {
-        console.log(`Found movie in daily chart ${dateStr}: "${titleMatch[1]}" (looking for "${title}")`);
+        console.log(`Found movie in yearly chart: "${titleMatch[1]}" (looking for "${title}")`);
 
-        // Extract all cells from this row
-        const cells = row.match(/<td[^>]*>([^<]*)<\/td>/gi);
+        // The yearly chart has columns: Rank, Release, Gross, Theaters, Total Gross, Release Date, Distributor
+        // Extract all cell contents from this row
+        const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi);
 
         if (cells) {
-          for (const cell of cells) {
-            const content = cell.replace(/<[^>]*>/g, '').trim();
+          let theaters = 0;
+          let boxOffice = 0;
 
-            // Check for dollar amount (box office)
+          for (let i = 0; i < cells.length; i++) {
+            // Remove HTML tags to get cell content
+            const content = cells[i].replace(/<[^>]*>/g, '').trim();
+
+            // Check for dollar amount (Gross column)
             if (content.startsWith('$')) {
               const amount = parseMoney(content);
               if (amount > boxOffice) {
                 boxOffice = amount;
               }
             }
-            // Check for theater count (number between 100-5000, no $ sign)
+            // Check for theater count (plain number between 100-5000)
             else if (/^[\d,]+$/.test(content)) {
               const num = parseNumber(content);
               if (num >= 100 && num <= 5000) {
-                console.log(`Found potential theater count on ${dateStr}: ${num}`);
-                if (num > theaters) {
-                  theaters = num;
-                }
+                console.log(`Found theater count in yearly chart: ${num}`);
+                theaters = num;
               }
             }
           }
+
+          if (theaters > 0) {
+            console.log(`BOM yearly chart found theaters: ${theaters}, box office: ${boxOffice}`);
+            return { theaters, boxOffice: boxOffice > 0 ? boxOffice : null };
+          }
         }
-        break; // Found the movie, no need to continue
       }
     }
 
-    return { theaters, boxOffice };
+    console.log(`Movie "${title}" not found in yearly chart for ${year}`);
+    return { theaters: null, boxOffice: null };
   } catch (error) {
-    console.error(`Error scraping BOM daily ${dateStr}:`, error);
-    return { theaters: 0, boxOffice: 0 };
+    console.error(`Error scraping BOM yearly chart:`, error);
+    return { theaters: null, boxOffice: null };
   }
-}
-
-/**
- * Scrape BOM daily chart page for theater counts
- * This is the key insight: daily chart pages have theater counts in static HTML!
- */
-async function scrapeBOMDailyChart(title: string, releaseDate: string): Promise<{ theaters: number | null; boxOffice: number | null }> {
-  const normalizedTitle = normalizeTitle(title);
-  const baseDate = new Date(releaseDate);
-
-  // Generate dates to check: release date and 6 days after (opening week)
-  // We'll fetch these in parallel for speed
-  const datesToTry: string[] = [];
-  for (let i = 0; i <= 6; i++) {
-    const date = new Date(baseDate);
-    date.setDate(date.getDate() + i);
-    datesToTry.push(date.toISOString().split('T')[0]);
-  }
-
-  console.log(`BOM daily chart: checking dates ${datesToTry[0]} to ${datesToTry[datesToTry.length - 1]}`);
-
-  // Fetch all dates in parallel for speed
-  const results = await Promise.all(
-    datesToTry.map(dateStr => fetchDailyChartPage(dateStr, normalizedTitle, title))
-  );
-
-  // Find max theater count and latest box office
-  let maxTheaters = 0;
-  let latestBoxOffice = 0;
-
-  for (const result of results) {
-    if (result.theaters > maxTheaters) {
-      maxTheaters = result.theaters;
-    }
-    if (result.boxOffice > latestBoxOffice) {
-      latestBoxOffice = result.boxOffice;
-    }
-  }
-
-  if (maxTheaters > 0) {
-    console.log(`BOM daily chart found max theaters: ${maxTheaters}`);
-    return { theaters: maxTheaters, boxOffice: latestBoxOffice > 0 ? latestBoxOffice : null };
-  }
-
-  return { theaters: null, boxOffice: null };
 }
 
 /**
@@ -352,15 +315,15 @@ export async function scrapeBoxOfficeMojoBrowser(
     result.opening_weekend = bomResult.opening_weekend;
   }
 
-  // 2. Get theater counts from the daily chart pages (the key insight!)
-  // Daily chart pages have theater counts in static HTML
-  if (title && releaseDate) {
-    console.log('Trying BOM daily chart for theater counts...');
-    const dailyData = await scrapeBOMDailyChart(title, releaseDate);
-    if (dailyData.theaters) {
-      result.theater_count = dailyData.theaters;
-      result.widest_release = dailyData.theaters;
-      console.log(`Got theaters from BOM daily chart: ${dailyData.theaters}`);
+  // 2. Get theater counts from the yearly stats page (static HTML!)
+  // Much simpler than daily pages - one request gets all movies for the year
+  if (title && year) {
+    console.log('Trying BOM yearly chart for theater counts...');
+    const yearlyData = await scrapeBOMYearlyChart(title, year);
+    if (yearlyData.theaters) {
+      result.theater_count = yearlyData.theaters;
+      result.widest_release = yearlyData.theaters;
+      console.log(`Got theaters from BOM yearly chart: ${yearlyData.theaters}`);
     }
   }
 
