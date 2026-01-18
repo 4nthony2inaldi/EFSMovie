@@ -17,26 +17,36 @@ function getSupabaseAdmin() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { movieId, tmdbId, imdbId: providedImdbId, title, releaseYear } = await request.json();
+    const { movieId, tmdbId, imdbId: providedImdbId, title, releaseYear, releaseDate: providedReleaseDate } = await request.json();
 
     if (!movieId) {
       return NextResponse.json({ error: 'Movie ID is required' }, { status: 400 });
     }
 
     let imdbId = providedImdbId;
+    let releaseDate = providedReleaseDate;
 
-    // Always try to get fresh IMDB ID from TMDB (the stored one might be wrong)
+    // Always try to get fresh IMDB ID and release date from TMDB
     if (tmdbId) {
       try {
         const details = await tmdb.getMovieDetails(tmdbId);
-        const detailsAny = details as unknown as { external_ids?: { imdb_id?: string }; imdb_id?: string };
+        const detailsAny = details as unknown as {
+          external_ids?: { imdb_id?: string };
+          imdb_id?: string;
+          release_date?: string;
+        };
         const tmdbImdbId = detailsAny.external_ids?.imdb_id || detailsAny.imdb_id || null;
         if (tmdbImdbId) {
           console.log(`Got IMDB ID from TMDB: ${tmdbImdbId} (was: ${imdbId})`);
           imdbId = tmdbImdbId;
         }
+        // Get release date from TMDB if not provided
+        if (!releaseDate && detailsAny.release_date) {
+          releaseDate = detailsAny.release_date;
+          console.log(`Got release date from TMDB: ${releaseDate}`);
+        }
       } catch (e) {
-        console.error('Failed to get IMDB ID from TMDB:', e);
+        console.error('Failed to get details from TMDB:', e);
       }
     }
 
@@ -45,6 +55,13 @@ export async function POST(request: NextRequest) {
         error: 'IMDB ID is required for deep scraping',
         suggestion: 'Add IMDB ID to the movie first via quick refresh',
       }, { status: 400 });
+    }
+
+    // If we still don't have a release date, construct one from the year
+    if (!releaseDate && releaseYear) {
+      // Default to January 1 of the release year (we'll scan multiple dates anyway)
+      releaseDate = `${releaseYear}-01-01`;
+      console.log(`Using constructed release date: ${releaseDate}`);
     }
 
     // Update the IMDB ID in database if we got a fresh one
@@ -57,10 +74,10 @@ export async function POST(request: NextRequest) {
       console.log(`Updated IMDB ID in database: ${imdbId}`);
     }
 
-    console.log(`Starting enhanced scrape for ${imdbId} (${title} ${releaseYear})...`);
+    console.log(`Starting enhanced scrape for ${imdbId} (${title} ${releaseYear}, release: ${releaseDate})...`);
 
-    // Use multi-source scraper with title/year for fallback sources
-    const data = await scrapeBoxOfficeMojoBrowser(imdbId, title, releaseYear);
+    // Use multi-source scraper with title/year/releaseDate for theater counts
+    const data = await scrapeBoxOfficeMojoBrowser(imdbId, title, releaseYear, releaseDate);
 
     if (!data) {
       return NextResponse.json({

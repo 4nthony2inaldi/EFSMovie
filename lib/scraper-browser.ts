@@ -1,10 +1,8 @@
 /**
  * Alternative scraper for Box Office Mojo
- * Uses The Numbers API and OMDB as fallback sources for theater data
- * Can use Playwright with remote browser service for JS-rendered content
+ * Uses daily chart pages which have theater counts in static HTML
+ * Falls back to The Numbers and OMDB for additional data
  */
-
-import { chromium, Browser } from 'playwright-core';
 
 export interface BrowserScrapeResult {
   domestic_box_office: number;
@@ -30,6 +28,140 @@ function parseNumber(str: string): number {
   const cleaned = str.replace(/,/g, '');
   const num = parseInt(cleaned, 10);
   return isNaN(num) ? 0 : num;
+}
+
+/**
+ * Normalize a movie title for comparison
+ */
+function normalizeTitle(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .trim();
+}
+
+/**
+ * Fetch and parse a single BOM daily chart page
+ */
+async function fetchDailyChartPage(
+  dateStr: string,
+  normalizedTitle: string,
+  title: string
+): Promise<{ theaters: number; boxOffice: number }> {
+  try {
+    const url = `https://www.boxofficemojo.com/date/${dateStr}/`;
+    console.log(`Fetching BOM daily chart: ${url}`);
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+
+    if (!response.ok) {
+      console.log(`BOM daily chart ${dateStr} returned ${response.status}`);
+      return { theaters: 0, boxOffice: 0 };
+    }
+
+    const html = await response.text();
+    let theaters = 0;
+    let boxOffice = 0;
+
+    // Split into table rows
+    const rows = html.split(/<tr[^>]*>/i);
+
+    for (const row of rows) {
+      // Check if this row contains our movie title
+      const titleMatch = row.match(/<a[^>]*href="\/release\/[^"]*"[^>]*>([^<]+)<\/a>/i);
+      if (!titleMatch) continue;
+
+      const rowTitle = normalizeTitle(titleMatch[1]);
+
+      // Check if titles match (allow partial match for longer titles)
+      if (rowTitle.includes(normalizedTitle) || normalizedTitle.includes(rowTitle)) {
+        console.log(`Found movie in daily chart ${dateStr}: "${titleMatch[1]}" (looking for "${title}")`);
+
+        // Extract all cells from this row
+        const cells = row.match(/<td[^>]*>([^<]*)<\/td>/gi);
+
+        if (cells) {
+          for (const cell of cells) {
+            const content = cell.replace(/<[^>]*>/g, '').trim();
+
+            // Check for dollar amount (box office)
+            if (content.startsWith('$')) {
+              const amount = parseMoney(content);
+              if (amount > boxOffice) {
+                boxOffice = amount;
+              }
+            }
+            // Check for theater count (number between 100-5000, no $ sign)
+            else if (/^[\d,]+$/.test(content)) {
+              const num = parseNumber(content);
+              if (num >= 100 && num <= 5000) {
+                console.log(`Found potential theater count on ${dateStr}: ${num}`);
+                if (num > theaters) {
+                  theaters = num;
+                }
+              }
+            }
+          }
+        }
+        break; // Found the movie, no need to continue
+      }
+    }
+
+    return { theaters, boxOffice };
+  } catch (error) {
+    console.error(`Error scraping BOM daily ${dateStr}:`, error);
+    return { theaters: 0, boxOffice: 0 };
+  }
+}
+
+/**
+ * Scrape BOM daily chart page for theater counts
+ * This is the key insight: daily chart pages have theater counts in static HTML!
+ */
+async function scrapeBOMDailyChart(title: string, releaseDate: string): Promise<{ theaters: number | null; boxOffice: number | null }> {
+  const normalizedTitle = normalizeTitle(title);
+  const baseDate = new Date(releaseDate);
+
+  // Generate dates to check: release date and 6 days after (opening week)
+  // We'll fetch these in parallel for speed
+  const datesToTry: string[] = [];
+  for (let i = 0; i <= 6; i++) {
+    const date = new Date(baseDate);
+    date.setDate(date.getDate() + i);
+    datesToTry.push(date.toISOString().split('T')[0]);
+  }
+
+  console.log(`BOM daily chart: checking dates ${datesToTry[0]} to ${datesToTry[datesToTry.length - 1]}`);
+
+  // Fetch all dates in parallel for speed
+  const results = await Promise.all(
+    datesToTry.map(dateStr => fetchDailyChartPage(dateStr, normalizedTitle, title))
+  );
+
+  // Find max theater count and latest box office
+  let maxTheaters = 0;
+  let latestBoxOffice = 0;
+
+  for (const result of results) {
+    if (result.theaters > maxTheaters) {
+      maxTheaters = result.theaters;
+    }
+    if (result.boxOffice > latestBoxOffice) {
+      latestBoxOffice = result.boxOffice;
+    }
+  }
+
+  if (maxTheaters > 0) {
+    console.log(`BOM daily chart found max theaters: ${maxTheaters}`);
+    return { theaters: maxTheaters, boxOffice: latestBoxOffice > 0 ? latestBoxOffice : null };
+  }
+
+  return { theaters: null, boxOffice: null };
 }
 
 /**
@@ -123,145 +255,6 @@ async function tryOMDB(imdbId: string): Promise<{ theaters: number | null; boxOf
 }
 
 /**
- * Scrape BOM with a real browser (Playwright)
- * Uses remote browser service if BROWSER_WS_ENDPOINT is set
- */
-async function scrapeBOMWithBrowser(imdbId: string): Promise<BrowserScrapeResult | null> {
-  const browserEndpoint = process.env.BROWSER_WS_ENDPOINT;
-
-  // Skip browser scraping if no endpoint configured
-  if (!browserEndpoint) {
-    console.log('No BROWSER_WS_ENDPOINT configured, skipping browser scrape');
-    return null;
-  }
-
-  let browser: Browser | null = null;
-
-  try {
-    console.log(`Connecting to browser service for ${imdbId}...`);
-
-    // Connect to remote browser (e.g., Browserless.io, Playwright cloud, etc.)
-    browser = await chromium.connect(browserEndpoint);
-
-    const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    });
-
-    const page = await context.newPage();
-    const url = `https://www.boxofficemojo.com/title/${imdbId}/`;
-
-    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
-
-    // Wait a bit for JS to render
-    await page.waitForTimeout(2000);
-
-    // Get the page text
-    const pageText = await page.evaluate(() => document.body.innerText);
-
-    const result: BrowserScrapeResult = {
-      domestic_box_office: 0,
-      theater_count: 0,
-      opening_weekend: null,
-      opening_theaters: null,
-      widest_release: null,
-    };
-
-    // Extract domestic box office
-    const domesticMatch = pageText.match(/DOMESTIC[^\$]*\$([\d,]+)/i);
-    if (domesticMatch) {
-      result.domestic_box_office = parseMoney(domesticMatch[1]);
-    }
-
-    // Extract opening weekend
-    const openingMatch = pageText.match(/Opening[^\$]*\$([\d,]+)/i);
-    if (openingMatch) {
-      result.opening_weekend = parseMoney(openingMatch[1]);
-    }
-
-    // Extract theater counts from JS-rendered content
-    const theaterMatches = pageText.match(/([\d,]+)\s*theaters?/gi);
-    if (theaterMatches) {
-      console.log(`Browser found theater patterns: ${theaterMatches.join(', ')}`);
-      const counts = theaterMatches.map(m => {
-        const numMatch = m.match(/([\d,]+)/);
-        return numMatch ? parseNumber(numMatch[1]) : 0;
-      }).filter(n => n >= 100 && n < 10000);
-
-      if (counts.length > 0) {
-        result.widest_release = Math.max(...counts);
-        result.theater_count = result.widest_release;
-        result.opening_theaters = counts[0];
-        console.log(`Browser got theaters: ${result.theater_count}`);
-      }
-    }
-
-    await context.close();
-    console.log(`Browser scrape complete for ${imdbId}:`, result);
-    return result;
-  } catch (error) {
-    console.error(`Browser scrape error for ${imdbId}:`, error);
-    return null;
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
-  }
-}
-
-/**
- * Try scraping Wikipedia for theater count (often in static HTML)
- */
-async function scrapeWikipedia(title: string, year: number): Promise<number | null> {
-  try {
-    // Format for Wikipedia URL
-    const wikiTitle = title.replace(/\s+/g, '_').replace(/[:']/g, '');
-    const urls = [
-      `https://en.wikipedia.org/wiki/${wikiTitle}_(${year}_film)`,
-      `https://en.wikipedia.org/wiki/${wikiTitle}_(film)`,
-      `https://en.wikipedia.org/wiki/${wikiTitle}`,
-    ];
-
-    for (const url of urls) {
-      console.log(`Trying Wikipedia: ${url}`);
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; MovieBot/1.0)',
-        },
-      });
-
-      if (!response.ok) continue;
-
-      const html = await response.text();
-
-      // Wikipedia often has theater count in infobox or box office section
-      // Look for patterns like "3,506 theaters" or "widest release" info
-      const patterns = [
-        /(\d{1,2},?\d{3})\s*theaters?/gi,
-        /widest[^0-9]*(\d{1,2},?\d{3})/gi,
-        /opened[^0-9]*(\d{1,2},?\d{3})\s*(?:theaters?|locations?|screens?)/gi,
-      ];
-
-      for (const pattern of patterns) {
-        const match = html.match(pattern);
-        if (match) {
-          const numMatch = match[0].match(/(\d[\d,]*)/);
-          if (numMatch) {
-            const num = parseNumber(numMatch[1]);
-            if (num >= 500 && num < 10000) {
-              console.log(`Wikipedia found theaters: ${num}`);
-              return num;
-            }
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Wikipedia scrape error:', error);
-  }
-  return null;
-}
-
-/**
  * Enhanced Box Office Mojo scraper
  * Note: BOM loads theater data via JavaScript, so this only gets box office
  */
@@ -334,43 +327,44 @@ async function scrapeBOMEnhanced(imdbId: string): Promise<BrowserScrapeResult | 
 
 /**
  * Main scraper function - combines multiple sources
+ * releaseDate should be in YYYY-MM-DD format for best results
  */
-export async function scrapeBoxOfficeMojoBrowser(imdbId: string, title?: string, year?: number): Promise<BrowserScrapeResult | null> {
-  console.log(`Starting enhanced scrape for ${imdbId} (${title} ${year})`);
-
-  // First try browser-based scraping if a browser endpoint is configured
-  // This can get theater counts that are loaded via JavaScript
-  const browserResult = await scrapeBOMWithBrowser(imdbId);
-  if (browserResult && browserResult.theater_count > 0) {
-    console.log('Browser scrape successful with theater count!');
-    return browserResult;
-  }
-
-  // Fall back to static HTML scraping (gets box office but not theater counts)
-  const bomResult = await scrapeBOMEnhanced(imdbId);
+export async function scrapeBoxOfficeMojoBrowser(
+  imdbId: string,
+  title?: string,
+  year?: number,
+  releaseDate?: string
+): Promise<BrowserScrapeResult | null> {
+  console.log(`Starting enhanced scrape for ${imdbId} (${title} ${year}, release: ${releaseDate})`);
 
   const result: BrowserScrapeResult = {
-    domestic_box_office: browserResult?.domestic_box_office || bomResult?.domestic_box_office || 0,
-    theater_count: browserResult?.theater_count || bomResult?.theater_count || 0,
-    opening_weekend: browserResult?.opening_weekend || bomResult?.opening_weekend || null,
-    opening_theaters: browserResult?.opening_theaters || bomResult?.opening_theaters || null,
-    widest_release: browserResult?.widest_release || bomResult?.widest_release || null,
+    domestic_box_office: 0,
+    theater_count: 0,
+    opening_weekend: null,
+    opening_theaters: null,
+    widest_release: null,
   };
 
-  // BOM theater counts are loaded via JS, so try alternative sources
-  if (!result.theater_count && title && year) {
-    console.log('No theater count from BOM, trying Wikipedia...');
+  // 1. Get box office data from the movie's title page (this works with static HTML)
+  const bomResult = await scrapeBOMEnhanced(imdbId);
+  if (bomResult) {
+    result.domestic_box_office = bomResult.domestic_box_office;
+    result.opening_weekend = bomResult.opening_weekend;
+  }
 
-    // Try Wikipedia (often has theater counts in static HTML)
-    const wikiTheaters = await scrapeWikipedia(title, year);
-    if (wikiTheaters) {
-      result.theater_count = wikiTheaters;
-      result.widest_release = wikiTheaters;
-      console.log(`Got theaters from Wikipedia: ${wikiTheaters}`);
+  // 2. Get theater counts from the daily chart pages (the key insight!)
+  // Daily chart pages have theater counts in static HTML
+  if (title && releaseDate) {
+    console.log('Trying BOM daily chart for theater counts...');
+    const dailyData = await scrapeBOMDailyChart(title, releaseDate);
+    if (dailyData.theaters) {
+      result.theater_count = dailyData.theaters;
+      result.widest_release = dailyData.theaters;
+      console.log(`Got theaters from BOM daily chart: ${dailyData.theaters}`);
     }
   }
 
-  // If still no theater data, try The Numbers
+  // 3. Fallback: Try The Numbers for theater data
   if (!result.theater_count && title && year) {
     console.log('Trying The Numbers for theater count...');
     const numbersData = await scrapeTheNumbers(title, year);
@@ -384,7 +378,7 @@ export async function scrapeBoxOfficeMojoBrowser(imdbId: string, title?: string,
     }
   }
 
-  // Try OMDB as last resort for box office
+  // 4. Fallback: Try OMDB for box office
   if (!result.domestic_box_office) {
     const omdbData = await tryOMDB(imdbId);
     if (omdbData.boxOffice) {

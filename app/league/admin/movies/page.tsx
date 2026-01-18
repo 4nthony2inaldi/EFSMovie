@@ -329,6 +329,11 @@ export default function LeagueMoviesPage() {
       // Use browser-based scraper if requested (for theater counts)
       const endpoint = useBrowser ? '/api/boxoffice/scrape-browser' : '/api/boxoffice/refresh';
 
+      // Construct release date from month and year (default to 15th of month for wider search)
+      const releaseDate = movie.release_month && movie.release_year
+        ? `${movie.release_year}-${String(movie.release_month).padStart(2, '0')}-15`
+        : undefined;
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -338,6 +343,7 @@ export default function LeagueMoviesPage() {
           imdbId: movie.imdb_id,
           title: movie.title,
           releaseYear: movie.release_year,
+          releaseDate,
         }),
       });
 
