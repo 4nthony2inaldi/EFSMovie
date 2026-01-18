@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
-import { Film, Loader2, Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Film, Loader2, Plus, Pencil, Trash2, Search, Download, Globe, Check, X } from 'lucide-react';
 
 interface Movie {
   id: string;
@@ -16,6 +16,19 @@ interface Movie {
   domestic_box_office: number;
   metacritic_score: number | null;
   calculated_score: number;
+  tmdb_id?: number;
+}
+
+interface TMDBMovie {
+  tmdb_id: number;
+  title: string;
+  overview: string;
+  release_date: string;
+  poster_url: string | null;
+  backdrop_url: string | null;
+  genre: string;
+  popularity: number;
+  vote_average: number;
 }
 
 const MONTHS = [
@@ -28,10 +41,19 @@ export default function LeagueMoviesPage() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [showTMDB, setShowTMDB] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [filterMonth, setFilterMonth] = useState<number | ''>('');
+
+  // TMDB state
+  const [tmdbMovies, setTmdbMovies] = useState<TMDBMovie[]>([]);
+  const [tmdbLoading, setTmdbLoading] = useState(false);
+  const [tmdbMonth, setTmdbMonth] = useState(new Date().getMonth() + 1);
+  const [tmdbYear, setTmdbYear] = useState(new Date().getFullYear());
+  const [importingIds, setImportingIds] = useState<Set<number>>(new Set());
+  const [importedIds, setImportedIds] = useState<Set<number>>(new Set());
 
   const [formData, setFormData] = useState({
     title: '',
@@ -47,6 +69,16 @@ export default function LeagueMoviesPage() {
     loadMovies();
   }, []);
 
+  // Track which TMDB movies are already imported
+  useEffect(() => {
+    const imported = new Set(
+      movies
+        .filter((m) => m.tmdb_id)
+        .map((m) => m.tmdb_id!)
+    );
+    setImportedIds(imported);
+  }, [movies]);
+
   async function loadMovies() {
     const { data } = await supabase
       .from('movies')
@@ -56,6 +88,64 @@ export default function LeagueMoviesPage() {
 
     setMovies(data || []);
     setLoading(false);
+  }
+
+  async function loadTMDBMovies() {
+    setTmdbLoading(true);
+    try {
+      const response = await fetch(`/api/tmdb/upcoming?year=${tmdbYear}&month=${tmdbMonth}`);
+      const data = await response.json();
+      setTmdbMovies(data.movies || []);
+    } catch (error) {
+      console.error('Failed to load TMDB movies:', error);
+    }
+    setTmdbLoading(false);
+  }
+
+  async function importTMDBMovie(tmdbMovie: TMDBMovie) {
+    setImportingIds((prev) => new Set(prev).add(tmdbMovie.tmdb_id));
+
+    try {
+      // Parse release date
+      const releaseDate = new Date(tmdbMovie.release_date);
+      const releaseMonth = releaseDate.getMonth() + 1;
+      const releaseYear = releaseDate.getFullYear();
+
+      // Fetch full details
+      const detailsResponse = await fetch(`/api/tmdb/movie/${tmdbMovie.tmdb_id}`);
+      const details = await detailsResponse.json();
+
+      // Insert into database
+      const { error } = await supabase.from('movies').insert({
+        title: tmdbMovie.title,
+        tmdb_id: tmdbMovie.tmdb_id,
+        release_date: tmdbMovie.release_date,
+        release_month: releaseMonth,
+        release_year: releaseYear,
+        poster_url: tmdbMovie.poster_url,
+        backdrop_url: tmdbMovie.backdrop_url,
+        genre: tmdbMovie.genre,
+        synopsis: details.synopsis || tmdbMovie.overview,
+        runtime_minutes: details.runtime_minutes,
+        director: details.director,
+        cast_list: details.cast_list,
+        trailer_url: details.trailer_url,
+      });
+
+      if (error) throw error;
+
+      setImportedIds((prev) => new Set(prev).add(tmdbMovie.tmdb_id));
+      loadMovies();
+    } catch (error) {
+      console.error('Failed to import movie:', error);
+      alert('Failed to import movie');
+    }
+
+    setImportingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(tmdbMovie.tmdb_id);
+      return next;
+    });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -109,6 +199,7 @@ export default function LeagueMoviesPage() {
     });
     setEditingId(movie.id);
     setShowForm(true);
+    setShowTMDB(false);
   }
 
   async function handleDelete(id: string) {
@@ -135,18 +226,150 @@ export default function LeagueMoviesPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Movies</h1>
-        <button
-          onClick={() => {
-            resetForm();
-            setEditingId(null);
-            setShowForm(true);
-          }}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Movie
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setShowTMDB(true);
+              setShowForm(false);
+              loadTMDBMovies();
+            }}
+            className="btn-secondary flex items-center gap-2"
+          >
+            <Globe className="h-4 w-4" />
+            Browse TMDB
+          </button>
+          <button
+            onClick={() => {
+              resetForm();
+              setEditingId(null);
+              setShowForm(true);
+              setShowTMDB(false);
+            }}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Manual
+          </button>
+        </div>
       </div>
+
+      {/* TMDB Browser */}
+      {showTMDB && (
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Globe className="h-5 w-5 text-blue-500" />
+                Browse TMDB Movies
+              </CardTitle>
+              <button
+                onClick={() => setShowTMDB(false)}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="h-5 w-5 text-gray-400" />
+              </button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4 mb-4">
+              <select
+                value={tmdbMonth}
+                onChange={(e) => setTmdbMonth(parseInt(e.target.value))}
+                className="input w-40"
+              >
+                {MONTHS.map((month, i) => (
+                  <option key={i} value={i + 1}>{month}</option>
+                ))}
+              </select>
+              <select
+                value={tmdbYear}
+                onChange={(e) => setTmdbYear(parseInt(e.target.value))}
+                className="input w-32"
+              >
+                {[2024, 2025, 2026, 2027].map((year) => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+              <button
+                onClick={loadTMDBMovies}
+                disabled={tmdbLoading}
+                className="btn-primary flex items-center gap-2"
+              >
+                {tmdbLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Load Movies
+              </button>
+            </div>
+
+            {tmdbLoading ? (
+              <div className="py-12 text-center">
+                <Loader2 className="h-8 w-8 text-purple-600 animate-spin mx-auto mb-2" />
+                <p className="text-gray-500">Loading movies from TMDB...</p>
+              </div>
+            ) : tmdbMovies.length === 0 ? (
+              <div className="py-12 text-center text-gray-500">
+                <Film className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <p>No movies found for {MONTHS[tmdbMonth - 1]} {tmdbYear}</p>
+                <p className="text-sm mt-1">Try a different month or year</p>
+              </div>
+            ) : (
+              <div className="grid gap-3 max-h-[500px] overflow-y-auto">
+                {tmdbMovies.map((movie) => {
+                  const isImported = importedIds.has(movie.tmdb_id);
+                  const isImporting = importingIds.has(movie.tmdb_id);
+
+                  return (
+                    <div
+                      key={movie.tmdb_id}
+                      className={`flex items-center gap-4 p-3 rounded-lg border ${
+                        isImported ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'
+                      }`}
+                    >
+                      {movie.poster_url ? (
+                        <img
+                          src={movie.poster_url}
+                          alt={movie.title}
+                          className="w-12 h-18 object-cover rounded"
+                        />
+                      ) : (
+                        <div className="w-12 h-18 bg-gray-200 rounded flex items-center justify-center">
+                          <Film className="h-6 w-6 text-gray-400" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-gray-900 truncate">{movie.title}</h3>
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <span>{movie.release_date}</span>
+                          <span>•</span>
+                          <Badge variant="gray">{movie.genre}</Badge>
+                        </div>
+                      </div>
+                      {isImported ? (
+                        <span className="flex items-center gap-1 text-green-600 text-sm font-medium">
+                          <Check className="h-4 w-4" />
+                          Added
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => importTMDBMovie(movie)}
+                          disabled={isImporting}
+                          className="btn-primary py-1.5 px-3 text-sm flex items-center gap-1"
+                        >
+                          {isImporting ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Download className="h-3 w-3" />
+                          )}
+                          Import
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Search and Filter */}
       <div className="flex gap-4 mb-6">
@@ -285,6 +508,7 @@ export default function LeagueMoviesPage() {
             <div className="py-12 text-center text-gray-500">
               <Film className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <p>No movies found</p>
+              <p className="text-sm mt-2">Click "Browse TMDB" to import real movies</p>
             </div>
           ) : (
             <table className="w-full">
