@@ -14,6 +14,10 @@ const nextConfig = {
       },
     ],
   },
+  // Explicitly pass server-side env vars
+  env: {
+    TMDB_API_KEY: process.env.TMDB_API_KEY,
+  },
 };
 
 module.exports = nextConfig;
