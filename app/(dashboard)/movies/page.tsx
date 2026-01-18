@@ -55,8 +55,9 @@ export default async function MoviesPage({
   // Filter by owner if needed
   const ownershipMap = new Map<string, string>();
   (teamMovies || []).forEach((tm) => {
-    if (tm.team && userTeam?.league_id && tm.team.league_id === userTeam.league_id) {
-      ownershipMap.set(tm.movie_id, tm.team.name);
+    const team = tm.team as unknown as { id: string; name: string; league_id: string } | null;
+    if (team && userTeam?.league_id && team.league_id === userTeam.league_id) {
+      ownershipMap.set(tm.movie_id, team.name);
     }
   });
 
