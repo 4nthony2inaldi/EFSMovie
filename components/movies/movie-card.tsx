@@ -20,9 +20,9 @@ export function MovieCard({ movie, ownerName, showOwner = true }: MovieCardProps
   return (
     <Link
       href={`/movies/${movie.id}`}
-      className="block bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1"
+      className="block w-full max-w-full bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1"
     >
-      <div className="flex">
+      <div className="flex w-full">
         {/* Poster */}
         <div className="w-20 sm:w-24 h-32 sm:h-36 bg-gray-200 flex-shrink-0">
           {movie.poster_url ? (

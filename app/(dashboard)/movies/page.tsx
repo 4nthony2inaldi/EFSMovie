@@ -131,9 +131,9 @@ export default async function MoviesPage({
           description="Try adjusting your filters or check back later."
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 w-full max-w-full">
           {filteredMovies.map((movie, index) => (
-            <div key={movie.id} className="relative">
+            <div key={movie.id} className="relative min-w-0">
               <div className="absolute -top-2 -left-2 w-7 h-7 sm:w-8 sm:h-8 bg-purple-600 text-white rounded-full flex items-center justify-center text-xs sm:text-sm font-bold z-10">
                 {index + 1}
               </div>
