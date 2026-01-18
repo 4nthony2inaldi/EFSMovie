@@ -508,7 +508,7 @@ export default function LeagueMoviesPage() {
             <div className="py-12 text-center text-gray-500">
               <Film className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <p>No movies found</p>
-              <p className="text-sm mt-2">Click "Browse TMDB" to import real movies</p>
+              <p className="text-sm mt-2">Click &quot;Browse TMDB&quot; to import real movies</p>
             </div>
           ) : (
             <table className="w-full">
