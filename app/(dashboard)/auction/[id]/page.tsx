@@ -83,9 +83,9 @@ export default function AuctionDetailPage({
         .select('movie:movies(*)')
         .eq('auction_id', auctionId);
 
-      const movieList = auctionMovies
-        ?.map((am: { movie: Movie | null }) => am.movie)
-        .filter((m): m is Movie => m !== null) || [];
+      const movieList = (auctionMovies || [])
+        .map((am) => (am as unknown as { movie: Movie }).movie)
+        .filter((m): m is Movie => m != null);
       setMovies(movieList);
 
       // Get existing bids
