@@ -59,23 +59,39 @@ const GENRES: Record<number, string> = {
 
 class TMDBClient {
   private apiKey: string;
+  private isBearerToken: boolean;
 
   constructor() {
     this.apiKey = process.env.TMDB_API_KEY || '';
+    // Detect if it's a bearer token (JWT) or API key
+    this.isBearerToken = this.apiKey.startsWith('eyJ');
   }
 
   private async fetch<T>(endpoint: string, params: Record<string, string> = {}): Promise<T> {
-    const searchParams = new URLSearchParams({
-      api_key: this.apiKey,
-      ...params,
-    });
+    const searchParams = new URLSearchParams(params);
+
+    // If using API key (not bearer token), add it to query params
+    if (!this.isBearerToken && this.apiKey) {
+      searchParams.set('api_key', this.apiKey);
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    // If using bearer token, add Authorization header
+    if (this.isBearerToken && this.apiKey) {
+      headers['Authorization'] = `Bearer ${this.apiKey}`;
+    }
 
     const response = await fetch(`${TMDB_BASE_URL}${endpoint}?${searchParams}`, {
+      headers,
       next: { revalidate: 3600 }, // Cache for 1 hour
     });
 
     if (!response.ok) {
-      throw new Error(`TMDB API error: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`TMDB API error: ${response.status} - ${errorText}`);
     }
 
     return response.json();
