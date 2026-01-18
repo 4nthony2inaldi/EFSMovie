@@ -91,7 +91,10 @@ export function OnboardingContent() {
         .select()
         .single();
 
-      if (leagueError) throw leagueError;
+      if (leagueError) {
+        console.error('League error details:', leagueError);
+        throw new Error(leagueError.message || leagueError.code || 'Failed to create league');
+      }
 
       // Create the team in this league
       const { error: teamError } = await supabase
@@ -107,8 +110,12 @@ export function OnboardingContent() {
       // Success! Redirect to league admin
       router.push('/league/admin');
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create league');
+    } catch (err: unknown) {
+      const errorMessage = err && typeof err === 'object' && 'message' in err
+        ? String(err.message)
+        : 'Failed to create league';
+      console.error('League creation error:', err);
+      setError(errorMessage);
       setLoading(false);
     }
   }
