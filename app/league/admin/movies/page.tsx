@@ -376,14 +376,15 @@ export default function LeagueMoviesPage() {
       return;
     }
 
-    if (!confirm(`Refresh box office data for ${moviesToRefresh.length} movies? This may take a few minutes.`)) {
+    if (!confirm(`Refresh all data (box office, theaters, metacritic) for ${moviesToRefresh.length} movies?\n\nThis uses the yearly stats page for theater counts and may take a few minutes.`)) {
       return;
     }
 
     setBulkRefreshing(true);
 
     try {
-      const response = await fetch('/api/boxoffice/refresh', {
+      // Use the deep scraper endpoint which gets theaters from yearly chart + metacritic
+      const response = await fetch('/api/boxoffice/scrape-browser', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -395,13 +396,13 @@ export default function LeagueMoviesPage() {
 
       if (response.ok) {
         await loadMovies();
-        alert(`Box office refresh complete: ${data.success} succeeded, ${data.failed} failed`);
+        alert(`Full refresh complete!\n\n✓ ${data.success} movies updated\n✗ ${data.failed} failed${data.errors?.length ? '\n\nErrors:\n' + data.errors.slice(0, 5).join('\n') : ''}`);
       } else {
         alert(`Refresh failed: ${data.error}`);
       }
     } catch (error) {
       console.error('Bulk refresh error:', error);
-      alert('Failed to refresh box office data');
+      alert('Failed to refresh data');
     }
 
     setBulkRefreshing(false);
