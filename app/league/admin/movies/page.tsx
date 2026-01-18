@@ -311,6 +311,20 @@ export default function LeagueMoviesPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Movies</h1>
         <div className="flex gap-2">
+          {movies.length > 0 && (
+            <button
+              onClick={handleDeleteAll}
+              disabled={bulkDeleting}
+              className="btn-danger flex items-center gap-2"
+            >
+              {bulkDeleting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+              Delete All
+            </button>
+          )}
           <button
             onClick={() => {
               setShowTMDB(true);
@@ -511,20 +525,6 @@ export default function LeagueMoviesPage() {
             <option key={i} value={i + 1}>{month}</option>
           ))}
         </select>
-        {movies.length > 0 && (
-          <button
-            onClick={handleDeleteAll}
-            disabled={bulkDeleting}
-            className="btn-danger flex items-center gap-2"
-          >
-            {bulkDeleting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Trash2 className="h-4 w-4" />
-            )}
-            Delete All
-          </button>
-        )}
       </div>
 
       {/* Add/Edit Form */}
