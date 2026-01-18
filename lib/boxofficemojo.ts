@@ -104,31 +104,51 @@ export async function scrapeBoxOfficeData(imdbId: string): Promise<BoxOfficeData
     }
 
     // Look for theater counts - BOM has table structure with "X,XXX theaters"
-    // The most reliable approach is to find all "X,XXX theaters" patterns on the page
+    // Try multiple approaches to find theater counts
+
+    // Approach 1: Direct "X,XXX theaters" pattern (handles "3,506 theaters")
     const theaterMatches = html.match(/([\d,]+)\s*theaters?/gi);
     if (theaterMatches) {
       const counts = theaterMatches.map(m => {
         const numMatch = m.match(/([\d,]+)/);
         return numMatch ? parseNumber(numMatch[1]) : 0;
-      }).filter(n => n >= 500 && n < 10000); // Filter to reasonable theater counts (500+ for wide release)
+      }).filter(n => n >= 100 && n < 10000); // Lower threshold to 100
 
       if (counts.length > 0) {
-        // Widest release is the largest number
         data.widest_release = Math.max(...counts);
         data.theater_count = data.widest_release;
-        // Opening theaters is usually the first mentioned (or smallest)
         data.opening_theaters = counts[0];
-
-        console.log(`Found theater counts: ${counts.join(', ')}, using widest=${data.widest_release}`);
+        console.log(`Found theater counts (pattern 1): ${counts.join(', ')}, using widest=${data.widest_release}`);
       }
     }
 
-    // Also try to find the opening weekend theaters specifically
-    const openingMatch = html.match(/Opening[^]*?([\d,]+)\s*theaters?/i);
-    if (openingMatch && !data.opening_theaters) {
-      const num = parseNumber(openingMatch[1]);
-      if (num >= 500 && num < 10000) {
-        data.opening_theaters = num;
+    // Approach 2: Look for "Widest Release" row with number nearby (handles table cells)
+    if (!data.theater_count) {
+      const widestMatch = html.match(/Widest\s*Release[^>]*>([^<]*<[^>]*>)*([\d,]+)/i);
+      if (widestMatch) {
+        const num = parseNumber(widestMatch[2] || widestMatch[1]);
+        if (num >= 100 && num < 10000) {
+          data.widest_release = num;
+          data.theater_count = num;
+          console.log(`Found theater count (pattern 2 - Widest): ${num}`);
+        }
+      }
+    }
+
+    // Approach 3: Look for 4-digit numbers followed by "theater" anywhere
+    if (!data.theater_count) {
+      const broadMatch = html.match(/(\d{1},?\d{3})\s*(?:<[^>]*>)*\s*theaters?/gi);
+      if (broadMatch) {
+        const counts = broadMatch.map(m => {
+          const numMatch = m.match(/(\d[\d,]*)/);
+          return numMatch ? parseNumber(numMatch[1]) : 0;
+        }).filter(n => n >= 100 && n < 10000);
+
+        if (counts.length > 0) {
+          data.widest_release = Math.max(...counts);
+          data.theater_count = data.widest_release;
+          console.log(`Found theater count (pattern 3 - broad): ${counts.join(', ')}`);
+        }
       }
     }
 
@@ -185,7 +205,8 @@ export async function scrapeMetacriticScore(title: string, year?: number): Promi
       if (match) {
         const score = parseInt(match[1], 10);
         if (score >= 0 && score <= 100) {
-          return score;
+          // Return as decimal (80 -> 0.80)
+          return score / 100;
         }
       }
     }
