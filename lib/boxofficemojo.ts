@@ -67,19 +67,26 @@ export async function scrapeBoxOfficeData(imdbId: string): Promise<BoxOfficeData
       scraped_at: new Date().toISOString(),
     };
 
-    // Look for Domestic box office - multiple patterns
-    // BOM typically shows: Domestic (X.X%) $XXX,XXX,XXX
-    const domesticPatterns = [
-      /Domestic[^<]*<[^>]*>\s*\$?([\d,]+)/i,
-      /Domestic[^$]*\$([\d,]+)/i,
-      /<span class="money">\$([\d,]+)<\/span>/,
-      /Gross[^$]*\$([\d,]+)/i,
-    ];
-
-    for (const pattern of domesticPatterns) {
-      const match = html.match(pattern);
-      if (match && data.domestic_box_office === 0) {
-        data.domestic_box_office = parseMoney(match[1] || match[0]);
+    // Look for Domestic box office
+    // BOM shows: "DOMESTIC (48.1%)" then "$15,000,000" - we need the dollar amount, not the percentage
+    // Look for dollar amounts that are at least $100,000 (6+ digits)
+    const moneyMatches = html.match(/\$[\d,]+/g);
+    if (moneyMatches) {
+      // Find the largest dollar amount on the page (likely the total gross)
+      const amounts = moneyMatches.map(m => parseMoney(m)).filter(n => n >= 100000);
+      if (amounts.length > 0) {
+        // The domestic box office is usually one of the larger amounts
+        // Sort descending and take a reasonable one (not worldwide which is largest)
+        amounts.sort((a, b) => b - a);
+        // If we have multiple amounts, domestic is often the 2nd or 3rd largest
+        // But for safety, let's look specifically for the domestic section
+        const domesticSection = html.match(/DOMESTIC[^$]*\$([\d,]+)/i);
+        if (domesticSection) {
+          data.domestic_box_office = parseMoney(domesticSection[1]);
+        } else if (amounts.length > 0) {
+          // Fallback to largest reasonable amount
+          data.domestic_box_office = amounts[0];
+        }
       }
     }
 
@@ -96,65 +103,32 @@ export async function scrapeBoxOfficeData(imdbId: string): Promise<BoxOfficeData
       }
     }
 
-    // Look for theater counts - BOM shows various theater-related data
-    // The HTML structure often includes spans with theater counts
+    // Look for theater counts - BOM has table structure with "X,XXX theaters"
+    // The most reliable approach is to find all "X,XXX theaters" patterns on the page
+    const theaterMatches = html.match(/([\d,]+)\s*theaters?/gi);
+    if (theaterMatches) {
+      const counts = theaterMatches.map(m => {
+        const numMatch = m.match(/([\d,]+)/);
+        return numMatch ? parseNumber(numMatch[1]) : 0;
+      }).filter(n => n >= 500 && n < 10000); // Filter to reasonable theater counts (500+ for wide release)
 
-    // Pattern for "Widest Release" section - this is the most reliable
-    const widestPatterns = [
-      /Widest Release<\/span><span[^>]*>([\d,]+)/i,
-      /Widest Release[^<]*<[^>]*>([\d,]+)/i,
-      /Widest Release[:\s]*([\d,]+)/i,
-      /widest[^0-9]*([\d,]+)\s*theater/i,
-    ];
+      if (counts.length > 0) {
+        // Widest release is the largest number
+        data.widest_release = Math.max(...counts);
+        data.theater_count = data.widest_release;
+        // Opening theaters is usually the first mentioned (or smallest)
+        data.opening_theaters = counts[0];
 
-    for (const pattern of widestPatterns) {
-      const match = html.match(pattern);
-      if (match && !data.widest_release) {
-        const num = parseNumber(match[1]);
-        if (num > 100) { // Sanity check - widest release should be > 100
-          data.widest_release = num;
-          data.theater_count = num;
-        }
+        console.log(`Found theater counts: ${counts.join(', ')}, using widest=${data.widest_release}`);
       }
     }
 
-    // Look for Opening theaters - often shows "X theaters" near opening weekend
-    const openingTheaterPatterns = [
-      /Opening[^<]*<[^>]*>\$([\d,]+)[^<]*<[^>]*>([\d,]+)\s*theater/i,
-      /Opening[^0-9]*\$[\d,]+[^0-9]*([\d,]+)\s*theater/i,
-      /([\d,]+)\s*theaters?\s*<\/span>[^<]*Opening/i,
-    ];
-
-    for (const pattern of openingTheaterPatterns) {
-      const match = html.match(pattern);
-      if (match && !data.opening_theaters) {
-        // Get the last capture group which should be the theater count
-        const num = parseNumber(match[match.length - 1]);
-        if (num > 100 && num < 10000) {
-          data.opening_theaters = num;
-        }
-      }
-    }
-
-    // If still no theater count, search more broadly
-    if (!data.theater_count) {
-      // Look for all instances of "X,XXX theaters" or similar
-      const theaterMatches = html.match(/([\d,]+)\s*theaters?/gi);
-      if (theaterMatches) {
-        const counts = theaterMatches.map(m => {
-          const numMatch = m.match(/([\d,]+)/);
-          return numMatch ? parseNumber(numMatch[1]) : 0;
-        }).filter(n => n >= 100 && n < 10000); // Filter to reasonable theater counts
-
-        if (counts.length > 0) {
-          // Widest release is usually the largest number
-          data.widest_release = Math.max(...counts);
-          data.theater_count = data.widest_release;
-          // Opening theaters is usually the smallest reasonable count
-          if (!data.opening_theaters && counts.length > 1) {
-            data.opening_theaters = Math.min(...counts);
-          }
-        }
+    // Also try to find the opening weekend theaters specifically
+    const openingMatch = html.match(/Opening[^]*?([\d,]+)\s*theaters?/i);
+    if (openingMatch && !data.opening_theaters) {
+      const num = parseNumber(openingMatch[1]);
+      if (num >= 500 && num < 10000) {
+        data.opening_theaters = num;
       }
     }
 
