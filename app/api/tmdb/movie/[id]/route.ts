@@ -14,9 +14,14 @@ export async function GET(
   try {
     const movie = await tmdb.getMovieDetails(movieId);
 
+    // Get IMDB ID from external_ids if available
+    const externalIds = (movie as Record<string, unknown>).external_ids as { imdb_id?: string } | undefined;
+    const imdbId = externalIds?.imdb_id || movie.imdb_id || null;
+
     // Transform to our format
     const transformed = {
       tmdb_id: movie.id,
+      imdb_id: imdbId,
       title: movie.title,
       synopsis: movie.overview,
       release_date: movie.release_date,

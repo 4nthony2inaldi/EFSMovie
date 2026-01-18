@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
-import { Film, Loader2, Plus, Pencil, Trash2, Search, Download, Globe, Check, X } from 'lucide-react';
+import { Film, Loader2, Plus, Pencil, Trash2, Search, Download, Globe, Check, X, RefreshCw, DollarSign } from 'lucide-react';
 
 interface Movie {
   id: string;
@@ -14,9 +14,12 @@ interface Movie {
   release_year: number;
   poster_url: string | null;
   domestic_box_office: number;
+  theater_count: number | null;
   metacritic_score: number | null;
   calculated_score: number;
   tmdb_id?: number;
+  imdb_id?: string;
+  box_office_updated_at?: string;
 }
 
 interface TMDBMovie {
@@ -57,6 +60,8 @@ export default function LeagueMoviesPage() {
   const [importedIds, setImportedIds] = useState<Set<number>>(new Set());
   const [bulkImporting, setBulkImporting] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
+  const [bulkRefreshing, setBulkRefreshing] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -317,6 +322,78 @@ export default function LeagueMoviesPage() {
     }
   }
 
+  async function refreshBoxOffice(movie: Movie) {
+    setRefreshingIds((prev) => new Set(prev).add(movie.id));
+
+    try {
+      const response = await fetch('/api/boxoffice/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          movieId: movie.id,
+          tmdbId: movie.tmdb_id,
+          title: movie.title,
+          releaseYear: movie.release_year,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(`Failed to refresh ${movie.title}: ${data.error}`);
+      } else {
+        await loadMovies();
+      }
+    } catch (error) {
+      console.error('Refresh error:', error);
+      alert(`Failed to refresh ${movie.title}`);
+    }
+
+    setRefreshingIds((prev) => {
+      const next = new Set(prev);
+      next.delete(movie.id);
+      return next;
+    });
+  }
+
+  async function refreshAllBoxOffice() {
+    const moviesToRefresh = movies.filter(m => m.tmdb_id);
+    if (moviesToRefresh.length === 0) {
+      alert('No movies with TMDB IDs to refresh');
+      return;
+    }
+
+    if (!confirm(`Refresh box office data for ${moviesToRefresh.length} movies? This may take a few minutes.`)) {
+      return;
+    }
+
+    setBulkRefreshing(true);
+
+    try {
+      const response = await fetch('/api/boxoffice/refresh', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          movieIds: moviesToRefresh.map(m => m.id),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        await loadMovies();
+        alert(`Box office refresh complete: ${data.success} succeeded, ${data.failed} failed`);
+      } else {
+        alert(`Refresh failed: ${data.error}`);
+      }
+    } catch (error) {
+      console.error('Bulk refresh error:', error);
+      alert('Failed to refresh box office data');
+    }
+
+    setBulkRefreshing(false);
+  }
+
   const filteredMovies = movies.filter((movie) => {
     const matchesSearch = movie.title.toLowerCase().includes(search.toLowerCase());
     const matchesMonth = filterMonth === '' || movie.release_month === filterMonth;
@@ -347,6 +424,18 @@ export default function LeagueMoviesPage() {
               <Trash2 className="h-4 w-4" />
             )}
             Delete All ({movies.length})
+          </button>
+          <button
+            onClick={refreshAllBoxOffice}
+            disabled={bulkRefreshing || movies.length === 0}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {bulkRefreshing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <DollarSign className="h-4 w-4" />
+            )}
+            Refresh Box Office
           </button>
           <button
             onClick={() => {
@@ -672,6 +761,7 @@ export default function LeagueMoviesPage() {
                   <th className="text-left p-4 font-semibold">Movie</th>
                   <th className="text-left p-4 font-semibold">Release</th>
                   <th className="text-left p-4 font-semibold">Box Office</th>
+                  <th className="text-left p-4 font-semibold">Theaters</th>
                   <th className="text-left p-4 font-semibold">Score</th>
                   <th className="text-right p-4 font-semibold">Actions</th>
                 </tr>
@@ -705,11 +795,29 @@ export default function LeagueMoviesPage() {
                       }
                     </td>
                     <td className="p-4">
+                      {movie.theater_count
+                        ? movie.theater_count.toLocaleString()
+                        : <span className="text-gray-400">-</span>
+                      }
+                    </td>
+                    <td className="p-4">
                       <Badge variant={movie.calculated_score > 500 ? 'green' : 'gray'}>
                         {movie.calculated_score.toFixed(1)} pts
                       </Badge>
                     </td>
                     <td className="p-4 text-right">
+                      <button
+                        onClick={() => refreshBoxOffice(movie)}
+                        disabled={refreshingIds.has(movie.id)}
+                        className="p-2 text-gray-400 hover:text-green-600 disabled:opacity-50"
+                        title="Refresh box office data"
+                      >
+                        {refreshingIds.has(movie.id) ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                      </button>
                       <button
                         onClick={() => startEdit(movie)}
                         className="p-2 text-gray-400 hover:text-purple-600"

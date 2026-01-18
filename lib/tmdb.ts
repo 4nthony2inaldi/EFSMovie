@@ -17,6 +17,7 @@ export interface TMDBMovieDetails extends TMDBMovie {
   runtime: number | null;
   budget: number;
   revenue: number;
+  imdb_id?: string;
   genres: { id: number; name: string }[];
   credits?: {
     cast: { name: string; character: string; order: number }[];
@@ -158,10 +159,10 @@ class TMDBClient {
     return allMovies;
   }
 
-  // Get movie details with credits
+  // Get movie details with credits and external IDs
   async getMovieDetails(movieId: number): Promise<TMDBMovieDetails> {
     return this.fetch<TMDBMovieDetails>(`/movie/${movieId}`, {
-      append_to_response: 'credits,videos',
+      append_to_response: 'credits,videos,external_ids',
     });
   }
 
