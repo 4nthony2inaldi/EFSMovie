@@ -224,10 +224,11 @@ export default function LeagueMoviesPage() {
 
     setBulkDeleting(true);
     try {
-      // Delete all movies
-      const { error } = await supabase.from('movies').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      if (error) throw error;
-      loadMovies();
+      // Delete movies one by one to ensure RLS works
+      for (const movie of movies) {
+        await supabase.from('movies').delete().eq('id', movie.id);
+      }
+      await loadMovies();
     } catch (error) {
       console.error('Failed to delete movies:', error);
       alert('Failed to delete movies');
