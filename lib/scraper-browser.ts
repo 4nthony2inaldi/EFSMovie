@@ -120,8 +120,61 @@ async function tryOMDB(imdbId: string): Promise<{ theaters: number | null; boxOf
 }
 
 /**
+ * Try scraping Wikipedia for theater count (often in static HTML)
+ */
+async function scrapeWikipedia(title: string, year: number): Promise<number | null> {
+  try {
+    // Format for Wikipedia URL
+    const wikiTitle = title.replace(/\s+/g, '_').replace(/[:']/g, '');
+    const urls = [
+      `https://en.wikipedia.org/wiki/${wikiTitle}_(${year}_film)`,
+      `https://en.wikipedia.org/wiki/${wikiTitle}_(film)`,
+      `https://en.wikipedia.org/wiki/${wikiTitle}`,
+    ];
+
+    for (const url of urls) {
+      console.log(`Trying Wikipedia: ${url}`);
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; MovieBot/1.0)',
+        },
+      });
+
+      if (!response.ok) continue;
+
+      const html = await response.text();
+
+      // Wikipedia often has theater count in infobox or box office section
+      // Look for patterns like "3,506 theaters" or "widest release" info
+      const patterns = [
+        /(\d{1,2},?\d{3})\s*theaters?/gi,
+        /widest[^0-9]*(\d{1,2},?\d{3})/gi,
+        /opened[^0-9]*(\d{1,2},?\d{3})\s*(?:theaters?|locations?|screens?)/gi,
+      ];
+
+      for (const pattern of patterns) {
+        const match = html.match(pattern);
+        if (match) {
+          const numMatch = match[0].match(/(\d[\d,]*)/);
+          if (numMatch) {
+            const num = parseNumber(numMatch[1]);
+            if (num >= 500 && num < 10000) {
+              console.log(`Wikipedia found theaters: ${num}`);
+              return num;
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Wikipedia scrape error:', error);
+  }
+  return null;
+}
+
+/**
  * Enhanced Box Office Mojo scraper
- * Uses multiple patterns to find theater data in the static HTML
+ * Note: BOM loads theater data via JavaScript, so this only gets box office
  */
 async function scrapeBOMEnhanced(imdbId: string): Promise<BrowserScrapeResult | null> {
   const url = `https://www.boxofficemojo.com/title/${imdbId}/`;
@@ -135,10 +188,12 @@ async function scrapeBOMEnhanced(imdbId: string): Promise<BrowserScrapeResult | 
     });
 
     if (!response.ok) {
+      console.log(`BOM returned ${response.status}`);
       return null;
     }
 
     const html = await response.text();
+    console.log(`BOM HTML length: ${html.length}`);
 
     const result: BrowserScrapeResult = {
       domestic_box_office: 0,
@@ -148,10 +203,11 @@ async function scrapeBOMEnhanced(imdbId: string): Promise<BrowserScrapeResult | 
       widest_release: null,
     };
 
-    // Extract domestic box office
+    // Extract domestic box office - this IS in static HTML
     const domesticMatch = html.match(/DOMESTIC[^$]*\$([\d,]+)/i);
     if (domesticMatch) {
       result.domestic_box_office = parseMoney(domesticMatch[1]);
+      console.log(`BOM found domestic: $${result.domestic_box_office}`);
     }
 
     // Extract opening weekend
@@ -160,11 +216,11 @@ async function scrapeBOMEnhanced(imdbId: string): Promise<BrowserScrapeResult | 
       result.opening_weekend = parseMoney(openingMatch[1]);
     }
 
-    // Try multiple patterns for theater counts
-    // BOM shows "3,506 theaters" in various places - use simple global pattern
+    // Theater counts are loaded via JavaScript on BOM - they won't be in static HTML
+    // Try anyway in case the page structure changes
     const allTheaterMatches = html.match(/([\d,]+)\s*theaters?/gi);
     if (allTheaterMatches) {
-      console.log(`Found theater patterns: ${allTheaterMatches.join(', ')}`);
+      console.log(`BOM theater patterns found: ${allTheaterMatches.join(', ')}`);
       const counts = allTheaterMatches.map(m => {
         const numMatch = m.match(/([\d,]+)/);
         return numMatch ? parseNumber(numMatch[1]) : 0;
@@ -174,21 +230,10 @@ async function scrapeBOMEnhanced(imdbId: string): Promise<BrowserScrapeResult | 
         result.widest_release = Math.max(...counts);
         result.theater_count = result.widest_release;
         result.opening_theaters = counts[0];
-        console.log(`Theater counts found: ${counts.join(', ')}, using widest=${result.widest_release}`);
+        console.log(`BOM theater counts: ${counts.join(', ')}, using=${result.widest_release}`);
       }
-    }
-
-    // Also try "Widest Release" specific pattern
-    if (!result.theater_count) {
-      const widestMatch = html.match(/Widest\s*Release[^0-9]*([\d,]+)/i);
-      if (widestMatch) {
-        const num = parseNumber(widestMatch[1]);
-        if (num >= 100 && num < 10000) {
-          result.widest_release = num;
-          result.theater_count = num;
-          console.log(`Found via Widest Release: ${num}`);
-        }
-      }
+    } else {
+      console.log('BOM: No theater patterns found in static HTML (loaded via JS)');
     }
 
     return result;
@@ -204,7 +249,7 @@ async function scrapeBOMEnhanced(imdbId: string): Promise<BrowserScrapeResult | 
 export async function scrapeBoxOfficeMojoBrowser(imdbId: string, title?: string, year?: number): Promise<BrowserScrapeResult | null> {
   console.log(`Starting enhanced scrape for ${imdbId} (${title} ${year})`);
 
-  // Start with BOM enhanced scraper
+  // Start with BOM enhanced scraper (gets box office, theater counts are JS-loaded)
   const bomResult = await scrapeBOMEnhanced(imdbId);
 
   const result: BrowserScrapeResult = {
@@ -215,12 +260,27 @@ export async function scrapeBoxOfficeMojoBrowser(imdbId: string, title?: string,
     widest_release: bomResult?.widest_release || null,
   };
 
-  // If we still don't have theater data and have title/year, try The Numbers
+  // BOM theater counts are loaded via JS, so try alternative sources
   if (!result.theater_count && title && year) {
+    console.log('BOM theater count not available, trying Wikipedia...');
+
+    // Try Wikipedia (often has theater counts in static HTML)
+    const wikiTheaters = await scrapeWikipedia(title, year);
+    if (wikiTheaters) {
+      result.theater_count = wikiTheaters;
+      result.widest_release = wikiTheaters;
+      console.log(`Got theaters from Wikipedia: ${wikiTheaters}`);
+    }
+  }
+
+  // If still no theater data, try The Numbers
+  if (!result.theater_count && title && year) {
+    console.log('Trying The Numbers for theater count...');
     const numbersData = await scrapeTheNumbers(title, year);
     if (numbersData.theaters) {
       result.theater_count = numbersData.theaters;
       result.widest_release = numbersData.theaters;
+      console.log(`Got theaters from The Numbers: ${numbersData.theaters}`);
     }
     if (!result.domestic_box_office && numbersData.boxOffice) {
       result.domestic_box_office = numbersData.boxOffice;
@@ -235,7 +295,7 @@ export async function scrapeBoxOfficeMojoBrowser(imdbId: string, title?: string,
     }
   }
 
-  console.log(`Enhanced scrape result for ${imdbId}:`, result);
+  console.log(`Enhanced scrape final result for ${imdbId}:`, result);
 
   // Return null if we got nothing useful
   if (result.domestic_box_office === 0 && result.theater_count === 0) {
