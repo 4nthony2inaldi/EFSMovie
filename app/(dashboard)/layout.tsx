@@ -36,12 +36,12 @@ export default async function DashboardLayout({
   const isCommissioner = !!commissionerLeague;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <NavSidebar teamName={team?.name} teamPhotoUrl={team?.photo_url} isCommissioner={isCommissioner} />
 
       {/* Main content */}
-      <main className="lg:ml-64 min-h-screen">
-        <div className="p-6 lg:p-8 pt-16 lg:pt-8">
+      <main className="lg:ml-64 min-h-screen overflow-x-hidden">
+        <div className="p-4 sm:p-6 lg:p-8 pt-16 lg:pt-8 max-w-full overflow-x-hidden">
           {children}
         </div>
       </main>

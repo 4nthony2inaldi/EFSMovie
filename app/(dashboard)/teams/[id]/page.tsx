@@ -90,14 +90,14 @@ export default async function TeamDetailPage({
       </Link>
 
       {/* Team Header */}
-      <Card className="mb-8">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center gap-6">
-            <Avatar name={team.name} src={team.photo_url} size="xl" className="w-24 h-24" />
+      <Card className="mb-8 overflow-hidden">
+        <CardContent className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+            <Avatar name={team.name} src={team.photo_url} size="xl" className="w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0" />
 
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-2xl font-bold text-gray-900">{team.name}</h1>
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{team.name}</h1>
                 {teamStanding?.rank === 1 && (
                   <Badge variant="gold">1st Place</Badge>
                 )}
@@ -108,22 +108,22 @@ export default async function TeamDetailPage({
                   <Badge variant="default">3rd Place</Badge>
                 )}
               </div>
-              <p className="text-gray-600">
+              <p className="text-gray-600 text-sm sm:text-base truncate">
                 Rank #{teamStanding?.rank || '-'} in {team.league?.name}
               </p>
             </div>
 
-            <div className="bg-purple-100 rounded-xl px-6 py-4 text-center">
-              <div className="text-3xl font-bold text-purple-600">
+            <div className="bg-purple-100 rounded-xl px-4 sm:px-6 py-3 sm:py-4 text-center flex-shrink-0">
+              <div className="text-2xl sm:text-3xl font-bold text-purple-600">
                 {formatScore(totalPoints)}
               </div>
-              <div className="text-sm text-purple-700">Total Points</div>
+              <div className="text-xs sm:text-sm text-purple-700">Total Points</div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid lg:grid-cols-3 gap-8">
+      <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
         {/* Stats */}
         <div className="lg:col-span-1 space-y-6">
           <Card>
@@ -231,12 +231,12 @@ function StatRow({
   value: string;
 }) {
   return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2 text-gray-600">
-        {icon}
-        <span>{label}</span>
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-2 text-gray-600 min-w-0">
+        <span className="flex-shrink-0">{icon}</span>
+        <span className="truncate">{label}</span>
       </div>
-      <span className="font-semibold text-gray-900">{value}</span>
+      <span className="font-semibold text-gray-900 flex-shrink-0">{value}</span>
     </div>
   );
 }
