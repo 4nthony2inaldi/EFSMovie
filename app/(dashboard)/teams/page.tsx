@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import type { TeamStanding } from '@/types';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/layout/header';
@@ -55,7 +56,7 @@ export default async function TeamsPage() {
       <Header title="Teams" subtitle="All teams in your league" />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {standings.map((team) => (
+        {standings.map((team: TeamStanding) => (
           <Link key={team.team_id} href={`/teams/${team.team_id}`}>
             <Card className="hover:shadow-lg transition-all hover:-translate-y-1 cursor-pointer h-full">
               <CardContent className="p-6">
