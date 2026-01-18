@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import type { Movie } from '@/types';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/layout/header';
@@ -55,10 +56,12 @@ export default async function TeamDetailPage({
   const { data: standings } = await supabase
     .rpc('get_league_standings', { p_league_id: team.league_id });
 
-  const teamStanding = standings?.find((s) => s.team_id === id);
+  const teamStanding = standings?.find((s: { team_id: string }) => s.team_id === id);
 
   // Calculate stats
-  const movies = teamMovies?.map((tm) => tm.movie).filter(Boolean) || [];
+  const movies = (teamMovies || [])
+    .map((tm) => (tm as unknown as { movie: Movie | null }).movie)
+    .filter((m): m is Movie => m != null);
   const totalPoints = movies.reduce((sum, m) => sum + (m?.calculated_score || 0), 0);
   const totalBoxOffice = movies.reduce((sum, m) => sum + (m?.domestic_box_office || 0), 0);
   const avgTheaters = movies.length > 0
