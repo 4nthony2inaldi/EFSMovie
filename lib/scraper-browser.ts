@@ -161,51 +161,33 @@ async function scrapeBOMEnhanced(imdbId: string): Promise<BrowserScrapeResult | 
     }
 
     // Try multiple patterns for theater counts
-    // Pattern 1: Look in JSON-LD data
-    const jsonLdMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i);
-    if (jsonLdMatch) {
-      try {
-        const jsonData = JSON.parse(jsonLdMatch[1]);
-        // Check for theater data in structured data
-        if (jsonData.numberOfTheaters) {
-          result.theater_count = jsonData.numberOfTheaters;
-        }
-      } catch {
-        // Ignore JSON parse errors
+    // BOM shows "3,506 theaters" in various places - use simple global pattern
+    const allTheaterMatches = html.match(/([\d,]+)\s*theaters?/gi);
+    if (allTheaterMatches) {
+      console.log(`Found theater patterns: ${allTheaterMatches.join(', ')}`);
+      const counts = allTheaterMatches.map(m => {
+        const numMatch = m.match(/([\d,]+)/);
+        return numMatch ? parseNumber(numMatch[1]) : 0;
+      }).filter(n => n >= 100 && n < 10000);
+
+      if (counts.length > 0) {
+        result.widest_release = Math.max(...counts);
+        result.theater_count = result.widest_release;
+        result.opening_theaters = counts[0];
+        console.log(`Theater counts found: ${counts.join(', ')}, using widest=${result.widest_release}`);
       }
     }
 
-    // Pattern 2: Look for "X,XXX theaters" in text
-    const theaterPatterns = [
-      />([\d,]+)\s*theaters?</gi,
-      /"theaters?"[^>]*>([\d,]+)/gi,
-      /theaters?["\s:>]*([\d,]+)/gi,
-    ];
-
-    for (const pattern of theaterPatterns) {
-      if (result.theater_count > 0) break;
-      let match;
-      while ((match = pattern.exec(html)) !== null) {
-        const num = parseNumber(match[1]);
+    // Also try "Widest Release" specific pattern
+    if (!result.theater_count) {
+      const widestMatch = html.match(/Widest\s*Release[^0-9]*([\d,]+)/i);
+      if (widestMatch) {
+        const num = parseNumber(widestMatch[1]);
         if (num >= 100 && num < 10000) {
-          if (!result.widest_release || num > result.widest_release) {
-            result.widest_release = num;
-            result.theater_count = num;
-          }
-          if (!result.opening_theaters) {
-            result.opening_theaters = num;
-          }
+          result.widest_release = num;
+          result.theater_count = num;
+          console.log(`Found via Widest Release: ${num}`);
         }
-      }
-    }
-
-    // Pattern 3: Look in data attributes
-    const dataMatch = html.match(/data-theaters?[="']\s*([\d,]+)/i);
-    if (dataMatch && !result.theater_count) {
-      const num = parseNumber(dataMatch[1]);
-      if (num >= 100 && num < 10000) {
-        result.theater_count = num;
-        result.widest_release = num;
       }
     }
 
