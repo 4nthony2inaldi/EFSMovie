@@ -383,6 +383,7 @@ export default function LeagueMoviesPage() {
     setBulkRefreshing(true);
 
     let successCount = 0;
+    let skippedCount = 0;
     let failCount = 0;
     const errors: string[] = [];
 
@@ -409,7 +410,12 @@ export default function LeagueMoviesPage() {
         });
 
         if (response.ok) {
-          successCount++;
+          const data = await response.json();
+          if (data.skipped) {
+            skippedCount++;
+          } else {
+            successCount++;
+          }
         } else {
           const data = await response.json();
           failCount++;
@@ -430,7 +436,17 @@ export default function LeagueMoviesPage() {
     await loadMovies();
     setBulkRefreshing(false);
 
-    alert(`Full refresh complete!\n\n✓ ${successCount} movies updated\n✗ ${failCount} failed${errors.length ? '\n\nErrors:\n' + errors.slice(0, 5).join('\n') : ''}`);
+    let message = `Full refresh complete!\n\n✓ ${successCount} movies updated`;
+    if (skippedCount > 0) {
+      message += `\n⊘ ${skippedCount} skipped (no theatrical data)`;
+    }
+    if (failCount > 0) {
+      message += `\n✗ ${failCount} failed`;
+    }
+    if (errors.length > 0) {
+      message += `\n\nErrors:\n${errors.slice(0, 5).join('\n')}`;
+    }
+    alert(message);
   }
 
   const filteredMovies = movies.filter((movie) => {

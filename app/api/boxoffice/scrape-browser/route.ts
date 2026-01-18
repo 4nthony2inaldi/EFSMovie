@@ -84,11 +84,13 @@ export async function POST(request: NextRequest) {
     const metacriticScore = title ? await scrapeMetacriticScore(title, releaseYear) : null;
 
     if (!data && metacriticScore === null) {
+      // Return success with skipped status - this is expected for non-theatrical releases
       return NextResponse.json({
-        error: 'Failed to scrape data from any source',
+        success: true,
+        skipped: true,
+        reason: 'No theatrical data found (likely streaming/limited release)',
         imdbId,
-        triedSources: ['Box Office Mojo', 'The Numbers', 'Metacritic'],
-      }, { status: 500 });
+      });
     }
 
     // Build update object
