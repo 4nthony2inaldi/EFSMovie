@@ -255,6 +255,9 @@ export default function LeagueMoviesPage() {
     if (!confirm(`Import all ${moviesToImport.length} movies?`)) return;
 
     setBulkImporting(true);
+    let successCount = 0;
+    let failCount = 0;
+    let lastError = '';
 
     for (const tmdbMovie of moviesToImport) {
       try {
@@ -270,7 +273,7 @@ export default function LeagueMoviesPage() {
         const details = await detailsResponse.json();
 
         // Insert into database
-        await supabase.from('movies').insert({
+        const { error } = await supabase.from('movies').insert({
           title: tmdbMovie.title,
           tmdb_id: tmdbMovie.tmdb_id,
           release_date: tmdbMovie.release_date,
@@ -286,8 +289,16 @@ export default function LeagueMoviesPage() {
           trailer_url: details.trailer_url,
         });
 
-        setImportedIds((prev) => new Set(prev).add(tmdbMovie.tmdb_id));
+        if (error) {
+          failCount++;
+          lastError = error.message;
+          console.error(`Failed to import ${tmdbMovie.title}:`, error);
+        } else {
+          successCount++;
+          setImportedIds((prev) => new Set(prev).add(tmdbMovie.tmdb_id));
+        }
       } catch (error) {
+        failCount++;
         console.error(`Failed to import ${tmdbMovie.title}:`, error);
       }
 
@@ -300,6 +311,10 @@ export default function LeagueMoviesPage() {
 
     setBulkImporting(false);
     loadMovies();
+
+    if (failCount > 0) {
+      alert(`Import completed: ${successCount} succeeded, ${failCount} failed.\nLast error: ${lastError}\n\nIf all failed, you may need to add an INSERT policy in Supabase.`);
+    }
   }
 
   const filteredMovies = movies.filter((movie) => {
