@@ -61,11 +61,16 @@ export async function GET(request: NextRequest) {
       vote_average: movie.vote_average,
     }));
 
-    return NextResponse.json({
-      year,
-      month,
-      movies: transformed,
-    });
+    return NextResponse.json(
+      {
+        year,
+        month,
+        movies: transformed,
+      },
+      {
+        headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
+      }
+    );
   } catch (error) {
     console.error('TMDB API error:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
