@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { scrapeBoxOfficeData, searchBoxOfficeMojo } from '@/lib/boxofficemojo';
+import { scrapeBoxOfficeData, searchBoxOfficeMojo, scrapeMetacriticScore } from '@/lib/boxofficemojo';
 import { tmdb } from '@/lib/tmdb';
 
 // Force Node.js runtime
@@ -51,27 +51,50 @@ export async function POST(request: NextRequest) {
     // Scrape Box Office Mojo
     const boxOfficeData = await scrapeBoxOfficeData(imdbId);
 
-    if (!boxOfficeData) {
+    // Scrape Metacritic score
+    const metacriticScore = await scrapeMetacriticScore(title, releaseYear);
+
+    if (!boxOfficeData && !metacriticScore) {
       return NextResponse.json({
-        error: 'Failed to scrape Box Office Mojo',
+        error: 'Failed to scrape any data',
         imdbId,
-        suggestion: 'The movie may not have box office data yet',
+        suggestion: 'The movie may not have box office or review data yet',
       }, { status: 404 });
+    }
+
+    // Build update object with only non-null values
+    const updateData: Record<string, unknown> = {
+      imdb_id: imdbId,
+      box_office_updated_at: new Date().toISOString(),
+    };
+
+    if (boxOfficeData) {
+      if (boxOfficeData.domestic_box_office > 0) {
+        updateData.domestic_box_office = boxOfficeData.domestic_box_office;
+      }
+      if (boxOfficeData.theater_count || boxOfficeData.widest_release) {
+        updateData.theater_count = boxOfficeData.theater_count || boxOfficeData.widest_release;
+      }
+      if (boxOfficeData.opening_weekend) {
+        updateData.opening_weekend = boxOfficeData.opening_weekend;
+      }
+      if (boxOfficeData.opening_theaters) {
+        updateData.opening_theaters = boxOfficeData.opening_theaters;
+      }
+      if (boxOfficeData.widest_release) {
+        updateData.widest_release = boxOfficeData.widest_release;
+      }
+    }
+
+    if (metacriticScore !== null) {
+      updateData.metacritic_score = metacriticScore;
     }
 
     // Update the movie in the database
     const supabase = getSupabaseAdmin();
     const { error: updateError } = await supabase
       .from('movies')
-      .update({
-        domestic_box_office: boxOfficeData.domestic_box_office,
-        theater_count: boxOfficeData.theater_count || boxOfficeData.widest_release,
-        opening_weekend: boxOfficeData.opening_weekend,
-        opening_theaters: boxOfficeData.opening_theaters,
-        widest_release: boxOfficeData.widest_release,
-        imdb_id: imdbId,
-        box_office_updated_at: boxOfficeData.scraped_at,
-      })
+      .update(updateData)
       .eq('id', movieId);
 
     if (updateError) {
@@ -85,7 +108,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       imdbId,
-      data: boxOfficeData,
+      data: {
+        ...boxOfficeData,
+        metacritic_score: metacriticScore,
+      },
     });
   } catch (error) {
     console.error('Box office refresh error:', error);
@@ -146,24 +172,45 @@ export async function PUT(request: NextRequest) {
         }
 
         const boxOfficeData = await scrapeBoxOfficeData(imdbId);
+        const metacriticScore = await scrapeMetacriticScore(movie.title, movie.release_year);
 
-        if (!boxOfficeData) {
+        if (!boxOfficeData && metacriticScore === null) {
           results.failed++;
-          results.errors.push(`${movie.title}: No box office data found`);
+          results.errors.push(`${movie.title}: No data found`);
           continue;
+        }
+
+        // Build update object with only non-null values
+        const updateData: Record<string, unknown> = {
+          imdb_id: imdbId,
+          box_office_updated_at: new Date().toISOString(),
+        };
+
+        if (boxOfficeData) {
+          if (boxOfficeData.domestic_box_office > 0) {
+            updateData.domestic_box_office = boxOfficeData.domestic_box_office;
+          }
+          if (boxOfficeData.theater_count || boxOfficeData.widest_release) {
+            updateData.theater_count = boxOfficeData.theater_count || boxOfficeData.widest_release;
+          }
+          if (boxOfficeData.opening_weekend) {
+            updateData.opening_weekend = boxOfficeData.opening_weekend;
+          }
+          if (boxOfficeData.opening_theaters) {
+            updateData.opening_theaters = boxOfficeData.opening_theaters;
+          }
+          if (boxOfficeData.widest_release) {
+            updateData.widest_release = boxOfficeData.widest_release;
+          }
+        }
+
+        if (metacriticScore !== null) {
+          updateData.metacritic_score = metacriticScore;
         }
 
         await supabase
           .from('movies')
-          .update({
-            domestic_box_office: boxOfficeData.domestic_box_office,
-            theater_count: boxOfficeData.theater_count || boxOfficeData.widest_release,
-            opening_weekend: boxOfficeData.opening_weekend,
-            opening_theaters: boxOfficeData.opening_theaters,
-            widest_release: boxOfficeData.widest_release,
-            imdb_id: imdbId,
-            box_office_updated_at: boxOfficeData.scraped_at,
-          })
+          .update(updateData)
           .eq('id', movie.id);
 
         results.success++;

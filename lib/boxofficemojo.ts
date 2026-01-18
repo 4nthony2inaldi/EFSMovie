@@ -11,6 +11,7 @@ export interface BoxOfficeData {
   opening_weekend: number | null;
   opening_theaters: number | null;
   widest_release: number | null;
+  metacritic_score: number | null;
   scraped_at: string;
 }
 
@@ -55,78 +56,169 @@ export async function scrapeBoxOfficeData(imdbId: string): Promise<BoxOfficeData
 
     const html = await response.text();
 
-    // Extract data using regex patterns (more reliable than DOM parsing in serverless)
+    // Extract data using regex patterns
     const data: BoxOfficeData = {
       domestic_box_office: 0,
       theater_count: 0,
       opening_weekend: null,
       opening_theaters: null,
       widest_release: null,
+      metacritic_score: null,
       scraped_at: new Date().toISOString(),
     };
 
-    // Look for Domestic box office - it's in a summary section
-    // Pattern: "Domestic" followed by money amount
-    const domesticMatch = html.match(/Domestic[^$]*\$[\d,]+/i);
-    if (domesticMatch) {
-      const moneyMatch = domesticMatch[0].match(/\$([\d,]+)/);
-      if (moneyMatch) {
-        data.domestic_box_office = parseMoney(moneyMatch[0]);
+    // Look for Domestic box office - multiple patterns
+    // BOM typically shows: Domestic (X.X%) $XXX,XXX,XXX
+    const domesticPatterns = [
+      /Domestic[^<]*<[^>]*>\s*\$?([\d,]+)/i,
+      /Domestic[^$]*\$([\d,]+)/i,
+      /<span class="money">\$([\d,]+)<\/span>/,
+      /Gross[^$]*\$([\d,]+)/i,
+    ];
+
+    for (const pattern of domesticPatterns) {
+      const match = html.match(pattern);
+      if (match && data.domestic_box_office === 0) {
+        data.domestic_box_office = parseMoney(match[1] || match[0]);
       }
     }
 
-    // Alternative pattern: Look for the money-delta span with domestic gross
-    const grossMatch = html.match(/<span class="money">\$([\d,]+)<\/span>/g);
-    if (grossMatch && grossMatch.length > 0) {
-      // First money span is usually domestic gross
-      const firstMoney = grossMatch[0].match(/\$([\d,]+)/);
-      if (firstMoney && data.domestic_box_office === 0) {
-        data.domestic_box_office = parseMoney(firstMoney[0]);
+    // Look for Opening Weekend - BOM shows "Opening" with dollar amount
+    const openingPatterns = [
+      /Opening[^$]*\$([\d,]+)/i,
+      /Opening Weekend[^$]*\$([\d,]+)/i,
+    ];
+
+    for (const pattern of openingPatterns) {
+      const match = html.match(pattern);
+      if (match && !data.opening_weekend) {
+        data.opening_weekend = parseMoney(match[1]);
       }
     }
 
-    // Look for Opening Weekend
-    const openingMatch = html.match(/Opening[^$]*\$([\d,]+)/i);
-    if (openingMatch) {
-      const moneyMatch = openingMatch[0].match(/\$([\d,]+)/);
-      if (moneyMatch) {
-        data.opening_weekend = parseMoney(moneyMatch[0]);
-      }
-    }
+    // Look for theater counts - BOM shows various theater-related data
+    // The HTML structure often includes spans with theater counts
 
-    // Look for theater counts - usually near "theaters" text
-    // Pattern: "X,XXX theaters" or "theaters: X,XXX"
-    const theaterMatches = html.match(/([\d,]+)\s*theaters/gi);
-    if (theaterMatches) {
-      const counts = theaterMatches.map(m => {
-        const numMatch = m.match(/([\d,]+)/);
-        return numMatch ? parseNumber(numMatch[1]) : 0;
-      }).filter(n => n > 0);
+    // Pattern for "Widest Release" section - this is the most reliable
+    const widestPatterns = [
+      /Widest Release<\/span><span[^>]*>([\d,]+)/i,
+      /Widest Release[^<]*<[^>]*>([\d,]+)/i,
+      /Widest Release[:\s]*([\d,]+)/i,
+      /widest[^0-9]*([\d,]+)\s*theater/i,
+    ];
 
-      if (counts.length > 0) {
-        // Widest release is usually the largest number
-        data.widest_release = Math.max(...counts);
-        data.theater_count = data.widest_release;
-
-        // Opening theaters might be first mentioned
-        if (counts.length > 1) {
-          data.opening_theaters = counts[0];
+    for (const pattern of widestPatterns) {
+      const match = html.match(pattern);
+      if (match && !data.widest_release) {
+        const num = parseNumber(match[1]);
+        if (num > 100) { // Sanity check - widest release should be > 100
+          data.widest_release = num;
+          data.theater_count = num;
         }
       }
     }
 
-    // Alternative: Look for "Widest Release" specifically
-    const widestMatch = html.match(/Widest Release[^0-9]*([\d,]+)/i);
-    if (widestMatch) {
-      data.widest_release = parseNumber(widestMatch[1]);
-      if (data.theater_count === 0) {
-        data.theater_count = data.widest_release;
+    // Look for Opening theaters - often shows "X theaters" near opening weekend
+    const openingTheaterPatterns = [
+      /Opening[^<]*<[^>]*>\$([\d,]+)[^<]*<[^>]*>([\d,]+)\s*theater/i,
+      /Opening[^0-9]*\$[\d,]+[^0-9]*([\d,]+)\s*theater/i,
+      /([\d,]+)\s*theaters?\s*<\/span>[^<]*Opening/i,
+    ];
+
+    for (const pattern of openingTheaterPatterns) {
+      const match = html.match(pattern);
+      if (match && !data.opening_theaters) {
+        // Get the last capture group which should be the theater count
+        const num = parseNumber(match[match.length - 1]);
+        if (num > 100 && num < 10000) {
+          data.opening_theaters = num;
+        }
       }
     }
+
+    // If still no theater count, search more broadly
+    if (!data.theater_count) {
+      // Look for all instances of "X,XXX theaters" or similar
+      const theaterMatches = html.match(/([\d,]+)\s*theaters?/gi);
+      if (theaterMatches) {
+        const counts = theaterMatches.map(m => {
+          const numMatch = m.match(/([\d,]+)/);
+          return numMatch ? parseNumber(numMatch[1]) : 0;
+        }).filter(n => n >= 100 && n < 10000); // Filter to reasonable theater counts
+
+        if (counts.length > 0) {
+          // Widest release is usually the largest number
+          data.widest_release = Math.max(...counts);
+          data.theater_count = data.widest_release;
+          // Opening theaters is usually the smallest reasonable count
+          if (!data.opening_theaters && counts.length > 1) {
+            data.opening_theaters = Math.min(...counts);
+          }
+        }
+      }
+    }
+
+    // Log what we found for debugging
+    console.log(`BOM scrape for ${imdbId}: box_office=${data.domestic_box_office}, theaters=${data.theater_count}, widest=${data.widest_release}`);
 
     return data;
   } catch (error) {
     console.error(`Error scraping BOM for ${imdbId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Scrape Metacritic score for a movie
+ */
+export async function scrapeMetacriticScore(title: string, year?: number): Promise<number | null> {
+  // Format title for URL: lowercase, replace spaces with dashes, remove special chars
+  const formattedTitle = title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+
+  const url = `https://www.metacritic.com/movie/${formattedTitle}/`;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      },
+    });
+
+    if (!response.ok) {
+      console.log(`Metacritic fetch failed: ${response.status} for ${title}`);
+      return null;
+    }
+
+    const html = await response.text();
+
+    // Look for metascore patterns
+    const scorePatterns = [
+      /metascore_w[^>]*>(\d+)</i,
+      /"ratingValue":\s*"?(\d+)"?/i,
+      /Metascore[^0-9]*(\d+)/i,
+      /<span[^>]*class="[^"]*metascore[^"]*"[^>]*>(\d+)/i,
+      /data-metascore="(\d+)"/i,
+    ];
+
+    for (const pattern of scorePatterns) {
+      const match = html.match(pattern);
+      if (match) {
+        const score = parseInt(match[1], 10);
+        if (score >= 0 && score <= 100) {
+          return score;
+        }
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`Error scraping Metacritic for ${title}:`, error);
     return null;
   }
 }
