@@ -158,9 +158,23 @@ export default function LeagueAuctionsPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Are you sure you want to delete this auction?')) return;
-    await supabase.from('auctions').delete().eq('id', id);
-    loadData();
+    if (!confirm('Are you sure you want to delete this auction?\n\nThis will also delete all bids and results, and refund any spent budget.')) return;
+
+    try {
+      const response = await fetch(`/api/auctions/${id}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(`Failed to delete: ${data.error}`);
+        return;
+      }
+
+      loadData();
+    } catch (error) {
+      alert('Failed to delete auction');
+    }
   }
 
   async function handleStatusChange(id: string, newStatus: string) {
