@@ -15,8 +15,8 @@ export async function GET(
     const movie = await tmdb.getMovieDetails(movieId);
 
     // Get IMDB ID from external_ids if available
-    const externalIds = (movie as Record<string, unknown>).external_ids as { imdb_id?: string } | undefined;
-    const imdbId = externalIds?.imdb_id || movie.imdb_id || null;
+    const movieAny = movie as unknown as { external_ids?: { imdb_id?: string }; imdb_id?: string };
+    const imdbId = movieAny.external_ids?.imdb_id || movieAny.imdb_id || null;
 
     // Transform to our format
     const transformed = {
