@@ -21,9 +21,18 @@ export default async function DashboardLayout({
     .eq('user_id', user.id)
     .single();
 
+  // Check if user is a commissioner
+  const { data: commissionerLeague } = await supabase
+    .from('leagues')
+    .select('id')
+    .eq('commissioner_user_id', user.id)
+    .single();
+
+  const isCommissioner = !!commissionerLeague;
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <NavSidebar teamName={team?.name} teamPhotoUrl={team?.photo_url} />
+      <NavSidebar teamName={team?.name} teamPhotoUrl={team?.photo_url} isCommissioner={isCommissioner} />
 
       {/* Main content */}
       <main className="lg:ml-64 min-h-screen">

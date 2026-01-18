@@ -8,10 +8,11 @@ import {
   Trophy,
   Gavel,
   Home,
-  ChevronRight
+  Settings,
+  Mail,
 } from 'lucide-react';
 
-export default async function AdminLayout({
+export default async function LeagueAdminLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -19,10 +20,19 @@ export default async function AdminLayout({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Check if user is admin
-  const isAdmin = user?.id === process.env.ADMIN_USER_ID;
+  if (!user) {
+    redirect('/login');
+  }
 
-  if (!user || !isAdmin) {
+  // Get league where user is commissioner
+  const { data: league } = await supabase
+    .from('leagues')
+    .select('id, name')
+    .eq('commissioner_user_id', user.id)
+    .single();
+
+  if (!league) {
+    // Not a commissioner, redirect to standings
     redirect('/standings');
   }
 
@@ -35,8 +45,8 @@ export default async function AdminLayout({
             <div className="flex items-center gap-3">
               <Shield className="h-8 w-8 text-gold-400" />
               <div>
-                <h1 className="text-xl font-bold">Admin Console</h1>
-                <p className="text-purple-300 text-sm">EFS Movie League</p>
+                <h1 className="text-xl font-bold">League Admin</h1>
+                <p className="text-purple-300 text-sm">{league.name}</p>
               </div>
             </div>
             <Link
@@ -53,20 +63,23 @@ export default async function AdminLayout({
       {/* Admin Navigation */}
       <nav className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex gap-1">
-            <NavLink href="/admin" icon={<Shield className="h-4 w-4" />}>
+          <div className="flex gap-1 overflow-x-auto">
+            <NavLink href="/league/admin" icon={<Shield className="h-4 w-4" />}>
               Dashboard
             </NavLink>
-            <NavLink href="/admin/leagues" icon={<Trophy className="h-4 w-4" />}>
-              Leagues
+            <NavLink href="/league/admin/settings" icon={<Settings className="h-4 w-4" />}>
+              Settings
             </NavLink>
-            <NavLink href="/admin/teams" icon={<Users className="h-4 w-4" />}>
+            <NavLink href="/league/admin/teams" icon={<Users className="h-4 w-4" />}>
               Teams
             </NavLink>
-            <NavLink href="/admin/movies" icon={<Film className="h-4 w-4" />}>
+            <NavLink href="/league/admin/invites" icon={<Mail className="h-4 w-4" />}>
+              Invites
+            </NavLink>
+            <NavLink href="/league/admin/movies" icon={<Film className="h-4 w-4" />}>
               Movies
             </NavLink>
-            <NavLink href="/admin/auctions" icon={<Gavel className="h-4 w-4" />}>
+            <NavLink href="/league/admin/auctions" icon={<Gavel className="h-4 w-4" />}>
               Auctions
             </NavLink>
           </div>
@@ -93,7 +106,7 @@ function NavLink({
   return (
     <Link
       href={href}
-      className="flex items-center gap-2 px-4 py-3 text-gray-600 hover:text-purple-600 hover:bg-purple-50 border-b-2 border-transparent hover:border-purple-600 transition-colors"
+      className="flex items-center gap-2 px-4 py-3 text-gray-600 hover:text-purple-600 hover:bg-purple-50 border-b-2 border-transparent hover:border-purple-600 transition-colors whitespace-nowrap"
     >
       {icon}
       {children}

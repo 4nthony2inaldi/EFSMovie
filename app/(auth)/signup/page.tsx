@@ -65,8 +65,8 @@ export default function SignUpPage() {
       return;
     }
 
-    // User signed up and confirmed, redirect to standings
-    router.push('/standings');
+    // User signed up and confirmed, redirect to onboarding
+    router.push('/onboarding');
     router.refresh();
   }
 

@@ -4,48 +4,44 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatScore, formatBoxOffice } from '@/lib/scoring';
-import { getMonthName } from '@/lib/utils';
-import { Film, Plus, Pencil, Trash2, Loader2, Search } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
+import { Film, Loader2, Plus, Pencil, Trash2, Search } from 'lucide-react';
 
 interface Movie {
   id: string;
   title: string;
   release_month: number;
   release_year: number;
-  release_date: string | null;
-  genre: string | null;
-  director: string | null;
-  metacritic_score: number | null;
+  poster_url: string | null;
   domestic_box_office: number;
-  theater_count: number;
+  metacritic_score: number | null;
   calculated_score: number;
 }
 
-export default function AdminMoviesPage() {
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+export default function LeagueMoviesPage() {
   const supabase = createClient();
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [filterMonth, setFilterMonth] = useState<number | ''>('');
+
   const [formData, setFormData] = useState({
     title: '',
-    release_month: 4,
-    release_year: 2026,
-    release_date: '',
-    genre: '',
-    director: '',
-    metacritic_score: '',
+    release_month: new Date().getMonth() + 1,
+    release_year: new Date().getFullYear(),
+    poster_url: '',
     domestic_box_office: 0,
     theater_count: 0,
-    oscar_nominations: 0,
-    oscar_wins: 0,
-    best_picture_nominated: false,
-    best_picture_won: false,
+    metacritic_score: '',
   });
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadMovies();
@@ -55,9 +51,9 @@ export default function AdminMoviesPage() {
     const { data } = await supabase
       .from('movies')
       .select('*')
-      .order('release_year', { ascending: true })
-      .order('release_month', { ascending: true })
-      .order('title', { ascending: true });
+      .order('release_year', { ascending: false })
+      .order('release_month', { ascending: false });
+
     setMovies(data || []);
     setLoading(false);
   }
@@ -70,16 +66,10 @@ export default function AdminMoviesPage() {
       title: formData.title,
       release_month: formData.release_month,
       release_year: formData.release_year,
-      release_date: formData.release_date || null,
-      genre: formData.genre || null,
-      director: formData.director || null,
+      poster_url: formData.poster_url || null,
+      domestic_box_office: formData.domestic_box_office || 0,
+      theater_count: formData.theater_count || 0,
       metacritic_score: formData.metacritic_score ? parseFloat(formData.metacritic_score) : null,
-      domestic_box_office: formData.domestic_box_office,
-      theater_count: formData.theater_count,
-      oscar_nominations: formData.oscar_nominations,
-      oscar_wins: formData.oscar_wins,
-      best_picture_nominated: formData.best_picture_nominated,
-      best_picture_won: formData.best_picture_won,
     };
 
     if (editingId) {
@@ -98,27 +88,13 @@ export default function AdminMoviesPage() {
   function resetForm() {
     setFormData({
       title: '',
-      release_month: 4,
-      release_year: 2026,
-      release_date: '',
-      genre: '',
-      director: '',
-      metacritic_score: '',
+      release_month: new Date().getMonth() + 1,
+      release_year: new Date().getFullYear(),
+      poster_url: '',
       domestic_box_office: 0,
       theater_count: 0,
-      oscar_nominations: 0,
-      oscar_wins: 0,
-      best_picture_nominated: false,
-      best_picture_won: false,
+      metacritic_score: '',
     });
-  }
-
-  async function handleDelete(id: string) {
-    if (!confirm('Are you sure you want to delete this movie?')) {
-      return;
-    }
-    await supabase.from('movies').delete().eq('id', id);
-    loadMovies();
   }
 
   function startEdit(movie: Movie) {
@@ -126,19 +102,19 @@ export default function AdminMoviesPage() {
       title: movie.title,
       release_month: movie.release_month,
       release_year: movie.release_year,
-      release_date: movie.release_date || '',
-      genre: movie.genre || '',
-      director: movie.director || '',
+      poster_url: movie.poster_url || '',
+      domestic_box_office: movie.domestic_box_office || 0,
+      theater_count: 0,
       metacritic_score: movie.metacritic_score?.toString() || '',
-      domestic_box_office: movie.domestic_box_office,
-      theater_count: movie.theater_count,
-      oscar_nominations: 0,
-      oscar_wins: 0,
-      best_picture_nominated: false,
-      best_picture_won: false,
     });
     setEditingId(movie.id);
     setShowForm(true);
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm('Are you sure you want to delete this movie?')) return;
+    await supabase.from('movies').delete().eq('id', id);
+    loadMovies();
   }
 
   const filteredMovies = movies.filter((movie) => {
@@ -158,7 +134,7 @@ export default function AdminMoviesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Manage Movies ({movies.length})</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Movies</h1>
         <button
           onClick={() => {
             resetForm();
@@ -172,33 +148,31 @@ export default function AdminMoviesPage() {
         </button>
       </div>
 
-      {/* Filters */}
+      {/* Search and Filter */}
       <div className="flex gap-4 mb-6">
-        <div className="relative flex-1 max-w-xs">
+        <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search movies..."
             className="input pl-10"
+            placeholder="Search movies..."
           />
         </div>
         <select
           value={filterMonth}
-          onChange={(e) => setFilterMonth(e.target.value ? parseInt(e.target.value) : '')}
-          className="input w-40"
+          onChange={(e) => setFilterMonth(e.target.value === '' ? '' : parseInt(e.target.value))}
+          className="input w-48"
         >
-          <option value="">All Months</option>
-          {[4, 5, 6, 7, 8, 9, 10, 11, 12, 1].map((m) => (
-            <option key={m} value={m}>
-              {getMonthName(m)}
-            </option>
+          <option value="">All months</option>
+          {MONTHS.map((month, i) => (
+            <option key={i} value={i + 1}>{month}</option>
           ))}
         </select>
       </div>
 
-      {/* Create/Edit Form */}
+      {/* Add/Edit Form */}
       {showForm && (
         <Card className="mb-6">
           <CardHeader>
@@ -206,7 +180,7 @@ export default function AdminMoviesPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid md:grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="label">Title</label>
                   <input
@@ -218,26 +192,14 @@ export default function AdminMoviesPage() {
                   />
                 </div>
                 <div>
-                  <label className="label">Genre</label>
-                  <input
-                    type="text"
-                    value={formData.genre}
-                    onChange={(e) => setFormData({ ...formData, genre: e.target.value })}
-                    className="input"
-                    placeholder="Action, Drama, etc."
-                  />
-                </div>
-                <div>
                   <label className="label">Release Month</label>
                   <select
                     value={formData.release_month}
                     onChange={(e) => setFormData({ ...formData, release_month: parseInt(e.target.value) })}
                     className="input"
                   >
-                    {[4, 5, 6, 7, 8, 9, 10, 11, 12, 1].map((m) => (
-                      <option key={m} value={m}>
-                        {getMonthName(m)}
-                      </option>
+                    {MONTHS.map((month, i) => (
+                      <option key={i} value={i + 1}>{month}</option>
                     ))}
                   </select>
                 </div>
@@ -248,24 +210,28 @@ export default function AdminMoviesPage() {
                     value={formData.release_year}
                     onChange={(e) => setFormData({ ...formData, release_year: parseInt(e.target.value) })}
                     className="input"
+                    min={2024}
+                    max={2030}
                   />
                 </div>
                 <div>
-                  <label className="label">Release Date</label>
+                  <label className="label">Box Office ($)</label>
                   <input
-                    type="date"
-                    value={formData.release_date}
-                    onChange={(e) => setFormData({ ...formData, release_date: e.target.value })}
+                    type="number"
+                    value={formData.domestic_box_office}
+                    onChange={(e) => setFormData({ ...formData, domestic_box_office: parseFloat(e.target.value) })}
                     className="input"
+                    min={0}
                   />
                 </div>
                 <div>
-                  <label className="label">Director</label>
+                  <label className="label">Theater Count</label>
                   <input
-                    type="text"
-                    value={formData.director}
-                    onChange={(e) => setFormData({ ...formData, director: e.target.value })}
+                    type="number"
+                    value={formData.theater_count}
+                    onChange={(e) => setFormData({ ...formData, theater_count: parseInt(e.target.value) })}
                     className="input"
+                    min={0}
                   />
                 </div>
                 <div>
@@ -277,26 +243,17 @@ export default function AdminMoviesPage() {
                     className="input"
                     min={0}
                     max={100}
+                    placeholder="0-100"
                   />
                 </div>
                 <div>
-                  <label className="label">Box Office ($)</label>
+                  <label className="label">Poster URL</label>
                   <input
-                    type="number"
-                    value={formData.domestic_box_office}
-                    onChange={(e) => setFormData({ ...formData, domestic_box_office: parseFloat(e.target.value) || 0 })}
+                    type="url"
+                    value={formData.poster_url}
+                    onChange={(e) => setFormData({ ...formData, poster_url: e.target.value })}
                     className="input"
-                    min={0}
-                  />
-                </div>
-                <div>
-                  <label className="label">Theater Count</label>
-                  <input
-                    type="number"
-                    value={formData.theater_count}
-                    onChange={(e) => setFormData({ ...formData, theater_count: parseInt(e.target.value) || 0 })}
-                    className="input"
-                    min={0}
+                    placeholder="https://..."
                   />
                 </div>
               </div>
@@ -330,51 +287,67 @@ export default function AdminMoviesPage() {
               <p>No movies found</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className="text-left p-4 font-semibold">Title</th>
-                    <th className="text-left p-4 font-semibold">Release</th>
-                    <th className="text-left p-4 font-semibold">Genre</th>
-                    <th className="text-right p-4 font-semibold">Metacritic</th>
-                    <th className="text-right p-4 font-semibold">Box Office</th>
-                    <th className="text-right p-4 font-semibold">Score</th>
-                    <th className="text-right p-4 font-semibold">Actions</th>
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="text-left p-4 font-semibold">Movie</th>
+                  <th className="text-left p-4 font-semibold">Release</th>
+                  <th className="text-left p-4 font-semibold">Box Office</th>
+                  <th className="text-left p-4 font-semibold">Score</th>
+                  <th className="text-right p-4 font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredMovies.map((movie) => (
+                  <tr key={movie.id} className="border-b border-gray-100">
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        {movie.poster_url ? (
+                          <img
+                            src={movie.poster_url}
+                            alt={movie.title}
+                            className="w-10 h-14 object-cover rounded"
+                          />
+                        ) : (
+                          <div className="w-10 h-14 bg-gray-200 rounded flex items-center justify-center">
+                            <Film className="h-5 w-5 text-gray-400" />
+                          </div>
+                        )}
+                        <span className="font-medium">{movie.title}</span>
+                      </div>
+                    </td>
+                    <td className="p-4 text-gray-600">
+                      {MONTHS[movie.release_month - 1]} {movie.release_year}
+                    </td>
+                    <td className="p-4">
+                      {movie.domestic_box_office > 0
+                        ? formatCurrency(movie.domestic_box_office)
+                        : <span className="text-gray-400">-</span>
+                      }
+                    </td>
+                    <td className="p-4">
+                      <Badge variant={movie.calculated_score > 500 ? 'green' : 'gray'}>
+                        {movie.calculated_score.toFixed(1)} pts
+                      </Badge>
+                    </td>
+                    <td className="p-4 text-right">
+                      <button
+                        onClick={() => startEdit(movie)}
+                        className="p-2 text-gray-400 hover:text-purple-600"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(movie.id)}
+                        className="p-2 text-gray-400 hover:text-red-600"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {filteredMovies.map((movie) => (
-                    <tr key={movie.id} className="border-b border-gray-100">
-                      <td className="p-4 font-medium">{movie.title}</td>
-                      <td className="p-4">
-                        <Badge variant="default">
-                          {getMonthName(movie.release_month)} {movie.release_year}
-                        </Badge>
-                      </td>
-                      <td className="p-4 text-gray-600">{movie.genre || '-'}</td>
-                      <td className="p-4 text-right">{movie.metacritic_score || '-'}</td>
-                      <td className="p-4 text-right">{formatBoxOffice(movie.domestic_box_office)}</td>
-                      <td className="p-4 text-right font-semibold">{formatScore(movie.calculated_score)}</td>
-                      <td className="p-4 text-right">
-                        <button
-                          onClick={() => startEdit(movie)}
-                          className="p-2 text-gray-400 hover:text-purple-600"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(movie.id)}
-                          className="p-2 text-gray-400 hover:text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           )}
         </CardContent>
       </Card>

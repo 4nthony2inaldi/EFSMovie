@@ -4,78 +4,120 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatDate, getMonthName } from '@/lib/utils';
-import { Gavel, Plus, Pencil, Trash2, Loader2, Play, Square } from 'lucide-react';
+import { formatDate } from '@/lib/utils';
+import { Gavel, Loader2, Plus, Pencil, Trash2, Film, Clock, CheckCircle, PlayCircle } from 'lucide-react';
 
 interface Auction {
   id: string;
-  league_id: string;
   for_month: number;
   for_year: number;
   opens_at: string;
   closes_at: string;
   status: string;
-  league?: { name: string };
 }
 
-interface League {
+interface Movie {
   id: string;
-  name: string;
+  title: string;
+  release_month: number;
+  release_year: number;
 }
 
-export default function AdminAuctionsPage() {
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+export default function LeagueAuctionsPage() {
   const supabase = createClient();
   const [auctions, setAuctions] = useState<Auction[]>([]);
-  const [leagues, setLeagues] = useState<League[]>([]);
+  const [availableMovies, setAvailableMovies] = useState<Movie[]>([]);
+  const [leagueId, setLeagueId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [selectedMovies, setSelectedMovies] = useState<string[]>([]);
+
   const [formData, setFormData] = useState({
-    league_id: '',
-    for_month: 4,
-    for_year: 2026,
+    for_month: new Date().getMonth() + 1,
+    for_year: new Date().getFullYear(),
     opens_at: '',
     closes_at: '',
-    status: 'upcoming',
   });
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadData();
   }, []);
 
   async function loadData() {
-    const [auctionsRes, leaguesRes] = await Promise.all([
-      supabase
-        .from('auctions')
-        .select('*, league:leagues(name)')
-        .order('for_year', { ascending: true })
-        .order('for_month', { ascending: true }),
-      supabase.from('leagues').select('id, name').order('name'),
-    ]);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-    setAuctions(auctionsRes.data || []);
-    setLeagues(leaguesRes.data || []);
+    // Get commissioner's league
+    const { data: league } = await supabase
+      .from('leagues')
+      .select('id')
+      .eq('commissioner_user_id', user.id)
+      .single();
+
+    if (!league) return;
+    setLeagueId(league.id);
+
+    // Get auctions
+    const { data: auctionsData } = await supabase
+      .from('auctions')
+      .select('*')
+      .eq('league_id', league.id)
+      .order('for_year', { ascending: false })
+      .order('for_month', { ascending: false });
+
+    setAuctions(auctionsData || []);
+
+    // Get movies
+    const { data: moviesData } = await supabase
+      .from('movies')
+      .select('id, title, release_month, release_year')
+      .order('release_year')
+      .order('release_month');
+
+    setAvailableMovies(moviesData || []);
     setLoading(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!leagueId) return;
     setSaving(true);
 
     const auctionData = {
-      league_id: formData.league_id,
+      league_id: leagueId,
       for_month: formData.for_month,
       for_year: formData.for_year,
       opens_at: formData.opens_at,
       closes_at: formData.closes_at,
-      status: formData.status,
+      status: 'upcoming',
     };
+
+    let auctionId = editingId;
 
     if (editingId) {
       await supabase.from('auctions').update(auctionData).eq('id', editingId);
     } else {
-      await supabase.from('auctions').insert(auctionData);
+      const { data } = await supabase.from('auctions').insert(auctionData).select().single();
+      auctionId = data?.id;
+    }
+
+    // Update auction movies
+    if (auctionId && selectedMovies.length > 0) {
+      // Remove existing
+      await supabase.from('auction_movies').delete().eq('auction_id', auctionId);
+      // Add new
+      const auctionMovies = selectedMovies.map(movieId => ({
+        auction_id: auctionId,
+        movie_id: movieId,
+      }));
+      await supabase.from('auction_movies').insert(auctionMovies);
     }
 
     setSaving(false);
@@ -86,20 +128,37 @@ export default function AdminAuctionsPage() {
   }
 
   function resetForm() {
+    const now = new Date();
     setFormData({
-      league_id: leagues[0]?.id || '',
-      for_month: 4,
-      for_year: 2026,
+      for_month: now.getMonth() + 1,
+      for_year: now.getFullYear(),
       opens_at: '',
       closes_at: '',
-      status: 'upcoming',
     });
+    setSelectedMovies([]);
+  }
+
+  async function startEdit(auction: Auction) {
+    setFormData({
+      for_month: auction.for_month,
+      for_year: auction.for_year,
+      opens_at: auction.opens_at.slice(0, 16),
+      closes_at: auction.closes_at.slice(0, 16),
+    });
+    setEditingId(auction.id);
+
+    // Load auction movies
+    const { data } = await supabase
+      .from('auction_movies')
+      .select('movie_id')
+      .eq('auction_id', auction.id);
+
+    setSelectedMovies(data?.map(am => am.movie_id) || []);
+    setShowForm(true);
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Are you sure you want to delete this auction?')) {
-      return;
-    }
+    if (!confirm('Are you sure you want to delete this auction?')) return;
     await supabase.from('auctions').delete().eq('id', id);
     loadData();
   }
@@ -109,25 +168,19 @@ export default function AdminAuctionsPage() {
     loadData();
   }
 
-  function startEdit(auction: Auction) {
-    setFormData({
-      league_id: auction.league_id,
-      for_month: auction.for_month,
-      for_year: auction.for_year,
-      opens_at: auction.opens_at.slice(0, 16),
-      closes_at: auction.closes_at.slice(0, 16),
-      status: auction.status,
-    });
-    setEditingId(auction.id);
-    setShowForm(true);
+  function getStatusIcon(status: string) {
+    switch (status) {
+      case 'upcoming': return <Clock className="h-3 w-3" />;
+      case 'open': return <PlayCircle className="h-3 w-3" />;
+      case 'resolved': return <CheckCircle className="h-3 w-3" />;
+      default: return null;
+    }
   }
 
-  const statusColors: Record<string, 'gray' | 'green' | 'red' | 'purple'> = {
-    upcoming: 'gray',
-    open: 'green',
-    closed: 'red',
-    resolved: 'purple',
-  };
+  // Filter movies by the selected month
+  const moviesForMonth = availableMovies.filter(
+    m => m.release_month === formData.for_month && m.release_year === formData.for_year
+  );
 
   if (loading) {
     return (
@@ -140,7 +193,7 @@ export default function AdminAuctionsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Manage Auctions</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Auctions</h1>
         <button
           onClick={() => {
             resetForm();
@@ -162,23 +215,7 @@ export default function AdminAuctionsPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <label className="label">League</label>
-                  <select
-                    value={formData.league_id}
-                    onChange={(e) => setFormData({ ...formData, league_id: e.target.value })}
-                    className="input"
-                    required
-                  >
-                    <option value="">Select League</option>
-                    {leagues.map((league) => (
-                      <option key={league.id} value={league.id}>
-                        {league.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="label">For Month</label>
                   <select
@@ -186,10 +223,8 @@ export default function AdminAuctionsPage() {
                     onChange={(e) => setFormData({ ...formData, for_month: parseInt(e.target.value) })}
                     className="input"
                   >
-                    {[4, 5, 6, 7, 8, 9, 10, 11, 12, 1].map((m) => (
-                      <option key={m} value={m}>
-                        {getMonthName(m)}
-                      </option>
+                    {MONTHS.map((month, i) => (
+                      <option key={i} value={i + 1}>{month}</option>
                     ))}
                   </select>
                 </div>
@@ -200,6 +235,8 @@ export default function AdminAuctionsPage() {
                     value={formData.for_year}
                     onChange={(e) => setFormData({ ...formData, for_year: parseInt(e.target.value) })}
                     className="input"
+                    min={2024}
+                    max={2030}
                   />
                 </div>
                 <div>
@@ -222,20 +259,46 @@ export default function AdminAuctionsPage() {
                     required
                   />
                 </div>
-                <div>
-                  <label className="label">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    className="input"
-                  >
-                    <option value="upcoming">Upcoming</option>
-                    <option value="open">Open</option>
-                    <option value="closed">Closed</option>
-                    <option value="resolved">Resolved</option>
-                  </select>
-                </div>
               </div>
+
+              {/* Movie Selection */}
+              <div>
+                <label className="label">Movies in this Auction</label>
+                {moviesForMonth.length === 0 ? (
+                  <p className="text-sm text-gray-500 p-4 bg-gray-50 rounded-lg">
+                    No movies found for {MONTHS[formData.for_month - 1]} {formData.for_year}.
+                    Add movies first.
+                  </p>
+                ) : (
+                  <div className="border border-gray-200 rounded-lg max-h-60 overflow-y-auto">
+                    {moviesForMonth.map((movie) => (
+                      <label
+                        key={movie.id}
+                        className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-0"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedMovies.includes(movie.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedMovies([...selectedMovies, movie.id]);
+                            } else {
+                              setSelectedMovies(selectedMovies.filter(id => id !== movie.id));
+                            }
+                          }}
+                          className="w-4 h-4 text-purple-600 rounded"
+                        />
+                        <Film className="h-4 w-4 text-gray-400" />
+                        <span>{movie.title}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedMovies.length} movies selected
+                </p>
+              </div>
+
               <div className="flex gap-2">
                 <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2">
                   {saving && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -263,14 +326,14 @@ export default function AdminAuctionsPage() {
           {auctions.length === 0 ? (
             <div className="py-12 text-center text-gray-500">
               <Gavel className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p>No auctions created yet</p>
+              <p>No auctions yet</p>
+              <p className="text-sm mt-1">Create your first auction to get started</p>
             </div>
           ) : (
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left p-4 font-semibold">Auction</th>
-                  <th className="text-left p-4 font-semibold">League</th>
+                  <th className="text-left p-4 font-semibold">Month</th>
                   <th className="text-left p-4 font-semibold">Opens</th>
                   <th className="text-left p-4 font-semibold">Closes</th>
                   <th className="text-left p-4 font-semibold">Status</th>
@@ -280,40 +343,23 @@ export default function AdminAuctionsPage() {
               <tbody>
                 {auctions.map((auction) => (
                   <tr key={auction.id} className="border-b border-gray-100">
-                    <td className="p-4">
-                      <span className="font-medium">
-                        {getMonthName(auction.for_month)} {auction.for_year}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      {(auction.league as unknown as { name: string })?.name || '-'}
+                    <td className="p-4 font-medium">
+                      {MONTHS[auction.for_month - 1]} {auction.for_year}
                     </td>
                     <td className="p-4 text-gray-600">{formatDate(auction.opens_at)}</td>
                     <td className="p-4 text-gray-600">{formatDate(auction.closes_at)}</td>
                     <td className="p-4">
-                      <Badge variant={statusColors[auction.status] || 'gray'}>
-                        {auction.status}
-                      </Badge>
+                      <select
+                        value={auction.status}
+                        onChange={(e) => handleStatusChange(auction.id, e.target.value)}
+                        className="text-sm border rounded-lg px-2 py-1"
+                      >
+                        <option value="upcoming">Upcoming</option>
+                        <option value="open">Open</option>
+                        <option value="resolved">Resolved</option>
+                      </select>
                     </td>
                     <td className="p-4 text-right">
-                      {auction.status === 'upcoming' && (
-                        <button
-                          onClick={() => handleStatusChange(auction.id, 'open')}
-                          className="p-2 text-gray-400 hover:text-green-600"
-                          title="Open Auction"
-                        >
-                          <Play className="h-4 w-4" />
-                        </button>
-                      )}
-                      {auction.status === 'open' && (
-                        <button
-                          onClick={() => handleStatusChange(auction.id, 'closed')}
-                          className="p-2 text-gray-400 hover:text-red-600"
-                          title="Close Auction"
-                        >
-                          <Square className="h-4 w-4" />
-                        </button>
-                      )}
                       <button
                         onClick={() => startEdit(auction)}
                         className="p-2 text-gray-400 hover:text-purple-600"

@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  Shield,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -30,9 +31,10 @@ const navItems = [
 interface NavSidebarProps {
   teamName?: string;
   teamPhotoUrl?: string | null;
+  isCommissioner?: boolean;
 }
 
-export function NavSidebar({ teamName, teamPhotoUrl }: NavSidebarProps) {
+export function NavSidebar({ teamName, teamPhotoUrl, isCommissioner }: NavSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
@@ -136,6 +138,23 @@ export function NavSidebar({ teamName, teamPhotoUrl }: NavSidebarProps) {
                 </Link>
               );
             })}
+
+            {/* Commissioner Admin Link */}
+            {isCommissioner && (
+              <Link
+                href="/league/admin"
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  'flex items-center gap-3 px-4 py-3 rounded-lg transition-colors mt-4 border-t border-purple-700/50 pt-4',
+                  pathname.startsWith('/league/admin')
+                    ? 'bg-gold-500 text-gold-900 border-l-4 border-gold-600'
+                    : 'text-gold-400 hover:bg-purple-800 hover:text-gold-300'
+                )}
+              >
+                <Shield className="h-5 w-5" />
+                <span>League Admin</span>
+              </Link>
+            )}
           </nav>
 
           {/* Sign out */}
