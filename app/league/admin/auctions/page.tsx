@@ -287,7 +287,31 @@ export default function LeagueAuctionsPage() {
 
               {/* Movie Selection */}
               <div>
-                <label className="label">Movies in this Auction</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="label mb-0">Movies in this Auction</label>
+                  {moviesForMonth.length > 0 && (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMovies(moviesForMonth.map(m => m.id))}
+                        className="text-xs text-purple-600 hover:text-purple-800 font-medium"
+                      >
+                        Select All ({moviesForMonth.length})
+                      </button>
+                      <span className="text-gray-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMovies([])}
+                        className="text-xs text-gray-500 hover:text-gray-700 font-medium"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mb-2">
+                  Showing movies releasing in {MONTHS[formData.for_month - 1]} {formData.for_year}
+                </p>
                 {moviesForMonth.length === 0 ? (
                   <p className="text-sm text-gray-500 p-4 bg-gray-50 rounded-lg">
                     No movies found for {MONTHS[formData.for_month - 1]} {formData.for_year}.
