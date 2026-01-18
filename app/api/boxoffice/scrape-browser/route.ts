@@ -25,12 +25,16 @@ export async function POST(request: NextRequest) {
 
     let imdbId = providedImdbId;
 
-    // Try to get IMDB ID from TMDB if not provided
-    if (!imdbId && tmdbId) {
+    // Always try to get fresh IMDB ID from TMDB (the stored one might be wrong)
+    if (tmdbId) {
       try {
         const details = await tmdb.getMovieDetails(tmdbId);
         const detailsAny = details as unknown as { external_ids?: { imdb_id?: string }; imdb_id?: string };
-        imdbId = detailsAny.external_ids?.imdb_id || detailsAny.imdb_id || null;
+        const tmdbImdbId = detailsAny.external_ids?.imdb_id || detailsAny.imdb_id || null;
+        if (tmdbImdbId) {
+          console.log(`Got IMDB ID from TMDB: ${tmdbImdbId} (was: ${imdbId})`);
+          imdbId = tmdbImdbId;
+        }
       } catch (e) {
         console.error('Failed to get IMDB ID from TMDB:', e);
       }
@@ -41,6 +45,16 @@ export async function POST(request: NextRequest) {
         error: 'IMDB ID is required for deep scraping',
         suggestion: 'Add IMDB ID to the movie first via quick refresh',
       }, { status: 400 });
+    }
+
+    // Update the IMDB ID in database if we got a fresh one
+    if (imdbId !== providedImdbId) {
+      const supabaseForUpdate = getSupabaseAdmin();
+      await supabaseForUpdate
+        .from('movies')
+        .update({ imdb_id: imdbId })
+        .eq('id', movieId);
+      console.log(`Updated IMDB ID in database: ${imdbId}`);
     }
 
     console.log(`Starting enhanced scrape for ${imdbId} (${title} ${releaseYear})...`);
