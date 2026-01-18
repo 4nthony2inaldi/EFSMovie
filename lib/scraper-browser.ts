@@ -1,7 +1,10 @@
 /**
  * Alternative scraper for Box Office Mojo
  * Uses The Numbers API and OMDB as fallback sources for theater data
+ * Can use Playwright with remote browser service for JS-rendered content
  */
+
+import { chromium, Browser } from 'playwright-core';
 
 export interface BrowserScrapeResult {
   domestic_box_office: number;
@@ -117,6 +120,92 @@ async function tryOMDB(imdbId: string): Promise<{ theaters: number | null; boxOf
   }
 
   return { theaters: null, boxOffice: null };
+}
+
+/**
+ * Scrape BOM with a real browser (Playwright)
+ * Uses remote browser service if BROWSER_WS_ENDPOINT is set
+ */
+async function scrapeBOMWithBrowser(imdbId: string): Promise<BrowserScrapeResult | null> {
+  const browserEndpoint = process.env.BROWSER_WS_ENDPOINT;
+
+  // Skip browser scraping if no endpoint configured
+  if (!browserEndpoint) {
+    console.log('No BROWSER_WS_ENDPOINT configured, skipping browser scrape');
+    return null;
+  }
+
+  let browser: Browser | null = null;
+
+  try {
+    console.log(`Connecting to browser service for ${imdbId}...`);
+
+    // Connect to remote browser (e.g., Browserless.io, Playwright cloud, etc.)
+    browser = await chromium.connect(browserEndpoint);
+
+    const context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    });
+
+    const page = await context.newPage();
+    const url = `https://www.boxofficemojo.com/title/${imdbId}/`;
+
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+
+    // Wait a bit for JS to render
+    await page.waitForTimeout(2000);
+
+    // Get the page text
+    const pageText = await page.evaluate(() => document.body.innerText);
+
+    const result: BrowserScrapeResult = {
+      domestic_box_office: 0,
+      theater_count: 0,
+      opening_weekend: null,
+      opening_theaters: null,
+      widest_release: null,
+    };
+
+    // Extract domestic box office
+    const domesticMatch = pageText.match(/DOMESTIC[^\$]*\$([\d,]+)/i);
+    if (domesticMatch) {
+      result.domestic_box_office = parseMoney(domesticMatch[1]);
+    }
+
+    // Extract opening weekend
+    const openingMatch = pageText.match(/Opening[^\$]*\$([\d,]+)/i);
+    if (openingMatch) {
+      result.opening_weekend = parseMoney(openingMatch[1]);
+    }
+
+    // Extract theater counts from JS-rendered content
+    const theaterMatches = pageText.match(/([\d,]+)\s*theaters?/gi);
+    if (theaterMatches) {
+      console.log(`Browser found theater patterns: ${theaterMatches.join(', ')}`);
+      const counts = theaterMatches.map(m => {
+        const numMatch = m.match(/([\d,]+)/);
+        return numMatch ? parseNumber(numMatch[1]) : 0;
+      }).filter(n => n >= 100 && n < 10000);
+
+      if (counts.length > 0) {
+        result.widest_release = Math.max(...counts);
+        result.theater_count = result.widest_release;
+        result.opening_theaters = counts[0];
+        console.log(`Browser got theaters: ${result.theater_count}`);
+      }
+    }
+
+    await context.close();
+    console.log(`Browser scrape complete for ${imdbId}:`, result);
+    return result;
+  } catch (error) {
+    console.error(`Browser scrape error for ${imdbId}:`, error);
+    return null;
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
 }
 
 /**
@@ -249,20 +338,28 @@ async function scrapeBOMEnhanced(imdbId: string): Promise<BrowserScrapeResult | 
 export async function scrapeBoxOfficeMojoBrowser(imdbId: string, title?: string, year?: number): Promise<BrowserScrapeResult | null> {
   console.log(`Starting enhanced scrape for ${imdbId} (${title} ${year})`);
 
-  // Start with BOM enhanced scraper (gets box office, theater counts are JS-loaded)
+  // First try browser-based scraping if a browser endpoint is configured
+  // This can get theater counts that are loaded via JavaScript
+  const browserResult = await scrapeBOMWithBrowser(imdbId);
+  if (browserResult && browserResult.theater_count > 0) {
+    console.log('Browser scrape successful with theater count!');
+    return browserResult;
+  }
+
+  // Fall back to static HTML scraping (gets box office but not theater counts)
   const bomResult = await scrapeBOMEnhanced(imdbId);
 
   const result: BrowserScrapeResult = {
-    domestic_box_office: bomResult?.domestic_box_office || 0,
-    theater_count: bomResult?.theater_count || 0,
-    opening_weekend: bomResult?.opening_weekend || null,
-    opening_theaters: bomResult?.opening_theaters || null,
-    widest_release: bomResult?.widest_release || null,
+    domestic_box_office: browserResult?.domestic_box_office || bomResult?.domestic_box_office || 0,
+    theater_count: browserResult?.theater_count || bomResult?.theater_count || 0,
+    opening_weekend: browserResult?.opening_weekend || bomResult?.opening_weekend || null,
+    opening_theaters: browserResult?.opening_theaters || bomResult?.opening_theaters || null,
+    widest_release: browserResult?.widest_release || bomResult?.widest_release || null,
   };
 
   // BOM theater counts are loaded via JS, so try alternative sources
   if (!result.theater_count && title && year) {
-    console.log('BOM theater count not available, trying Wikipedia...');
+    console.log('No theater count from BOM, trying Wikipedia...');
 
     // Try Wikipedia (often has theater counts in static HTML)
     const wikiTheaters = await scrapeWikipedia(title, year);
