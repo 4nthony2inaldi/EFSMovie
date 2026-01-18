@@ -6,11 +6,19 @@ export async function GET(request: NextRequest) {
   const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString());
   const month = parseInt(searchParams.get('month') || (new Date().getMonth() + 1).toString());
 
+  // Debug: check env var
+  const apiKey = process.env.TMDB_API_KEY;
+  const hasKey = !!apiKey;
+  const keyLength = apiKey?.length || 0;
+
   // Check if API key is configured
-  if (!process.env.TMDB_API_KEY) {
+  if (!apiKey) {
     console.error('TMDB_API_KEY environment variable is not set');
     return NextResponse.json(
-      { error: 'TMDB API is not configured. Please add TMDB_API_KEY to environment variables.' },
+      {
+        error: 'TMDB API is not configured. Please add TMDB_API_KEY to environment variables.',
+        debug: { hasKey, keyLength, nodeEnv: process.env.NODE_ENV }
+      },
       { status: 500 }
     );
   }
