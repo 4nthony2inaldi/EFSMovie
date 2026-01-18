@@ -24,7 +24,7 @@ export function MovieCard({ movie, ownerName, showOwner = true }: MovieCardProps
     >
       <div className="flex">
         {/* Poster */}
-        <div className="w-24 h-36 bg-gray-200 flex-shrink-0">
+        <div className="w-20 sm:w-24 h-32 sm:h-36 bg-gray-200 flex-shrink-0">
           {movie.poster_url ? (
             <img
               src={movie.poster_url}
@@ -39,20 +39,20 @@ export function MovieCard({ movie, ownerName, showOwner = true }: MovieCardProps
         </div>
 
         {/* Details */}
-        <div className="flex-1 p-4 min-w-0">
-          <h3 className="font-semibold text-gray-900 truncate mb-1">{movie.title}</h3>
+        <div className="flex-1 p-3 sm:p-4 min-w-0 overflow-hidden">
+          <h3 className="font-semibold text-gray-900 truncate mb-1 text-sm sm:text-base">{movie.title}</h3>
 
-          <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-            <Calendar className="h-3.5 w-3.5" />
-            <span>{MONTH_NAMES[movie.release_month]} {movie.release_year}</span>
+          <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-gray-500 mb-1.5 sm:mb-2">
+            <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
+            <span className="truncate">{MONTH_NAMES[movie.release_month]} {movie.release_year}</span>
           </div>
 
           {movie.genre && (
-            <p className="text-xs text-gray-500 mb-2">{movie.genre}</p>
+            <p className="text-xs text-gray-500 mb-1.5 sm:mb-2 truncate">{movie.genre}</p>
           )}
 
           {showOwner && (
-            <div className="mb-2">
+            <div className="mb-1.5 sm:mb-2">
               {ownerName ? (
                 <Badge variant="purple">{ownerName}</Badge>
               ) : (
@@ -62,7 +62,7 @@ export function MovieCard({ movie, ownerName, showOwner = true }: MovieCardProps
           )}
 
           {/* Stats */}
-          <div className="flex flex-wrap gap-2 text-xs">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2 text-xs">
             {movie.domestic_box_office > 0 && (
               <span className="text-gray-600">
                 {formatBoxOffice(movie.domestic_box_office)}
@@ -74,26 +74,20 @@ export function MovieCard({ movie, ownerName, showOwner = true }: MovieCardProps
                 {movie.metacritic_score}
               </span>
             )}
-            {(movie.oscar_nominations > 0 || movie.oscar_wins > 0) && (
-              <span className="flex items-center gap-0.5 text-gold-600">
-                <Trophy className="h-3 w-3" />
-                {movie.oscar_wins > 0 ? `${movie.oscar_wins} wins` : `${movie.oscar_nominations} noms`}
-              </span>
-            )}
           </div>
         </div>
 
         {/* Score */}
         <div
           className={cn(
-            'w-16 flex flex-col items-center justify-center text-center',
+            'w-12 sm:w-16 flex flex-col items-center justify-center text-center flex-shrink-0',
             scoreTier === 'gold' && 'bg-gold-200',
             scoreTier === 'purple' && 'bg-purple-100',
             scoreTier === 'white' && 'bg-gray-100',
             scoreTier === 'gray' && 'bg-gray-50'
           )}
         >
-          <span className="text-lg font-bold">{formatScore(movie.calculated_score)}</span>
+          <span className="text-base sm:text-lg font-bold">{formatScore(movie.calculated_score)}</span>
           <span className="text-xs text-gray-600">pts</span>
         </div>
       </div>
