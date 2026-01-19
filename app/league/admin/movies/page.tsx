@@ -7,11 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
 import { Film, Loader2, Plus, Pencil, Trash2, Search, Download, Globe, Check, X, RefreshCw, DollarSign } from 'lucide-react';
 
+type ReleaseType = 'wide' | 'limited' | 'streaming' | 'unknown';
+
 interface Movie {
   id: string;
   title: string;
   release_month: number;
   release_year: number;
+  release_type: ReleaseType;
   poster_url: string | null;
   domestic_box_office: number;
   theater_count: number | null;
@@ -21,6 +24,13 @@ interface Movie {
   imdb_id?: string;
   box_office_updated_at?: string;
 }
+
+const RELEASE_TYPES: { value: ReleaseType; label: string }[] = [
+  { value: 'wide', label: 'Wide Release' },
+  { value: 'limited', label: 'Limited Release' },
+  { value: 'streaming', label: 'Streaming Only' },
+  { value: 'unknown', label: 'Unknown' },
+];
 
 interface TMDBMovie {
   tmdb_id: number;
@@ -67,6 +77,7 @@ export default function LeagueMoviesPage() {
     title: '',
     release_month: new Date().getMonth() + 1,
     release_year: new Date().getFullYear(),
+    release_type: 'unknown' as ReleaseType,
     poster_url: '',
     domestic_box_office: 0,
     theater_count: 0,
@@ -177,6 +188,7 @@ export default function LeagueMoviesPage() {
       title: formData.title,
       release_month: formData.release_month,
       release_year: formData.release_year,
+      release_type: formData.release_type,
       poster_url: formData.poster_url || null,
       domestic_box_office: formData.domestic_box_office || 0,
       theater_count: formData.theater_count || 0,
@@ -201,6 +213,7 @@ export default function LeagueMoviesPage() {
       title: '',
       release_month: new Date().getMonth() + 1,
       release_year: new Date().getFullYear(),
+      release_type: 'unknown',
       poster_url: '',
       domestic_box_office: 0,
       theater_count: 0,
@@ -213,6 +226,7 @@ export default function LeagueMoviesPage() {
       title: movie.title,
       release_month: movie.release_month,
       release_year: movie.release_year,
+      release_type: movie.release_type || 'unknown',
       poster_url: movie.poster_url || '',
       domestic_box_office: movie.domestic_box_office || 0,
       theater_count: movie.theater_count || 0,
@@ -737,6 +751,18 @@ export default function LeagueMoviesPage() {
                   />
                 </div>
                 <div>
+                  <label className="label">Release Type</label>
+                  <select
+                    value={formData.release_type}
+                    onChange={(e) => setFormData({ ...formData, release_type: e.target.value as ReleaseType })}
+                    className="input"
+                  >
+                    {RELEASE_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>{type.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="label">Box Office ($)</label>
                   <input
                     type="number"
@@ -815,6 +841,7 @@ export default function LeagueMoviesPage() {
                 <tr className="border-b border-gray-200 bg-gray-50">
                   <th className="text-left p-4 font-semibold">Movie</th>
                   <th className="text-left p-4 font-semibold">Release</th>
+                  <th className="text-left p-4 font-semibold">Type</th>
                   <th className="text-left p-4 font-semibold">Box Office</th>
                   <th className="text-left p-4 font-semibold">Theaters</th>
                   <th className="text-left p-4 font-semibold">Score</th>
@@ -842,6 +869,23 @@ export default function LeagueMoviesPage() {
                     </td>
                     <td className="p-4 text-gray-600">
                       {MONTHS[movie.release_month - 1]} {movie.release_year}
+                    </td>
+                    <td className="p-4">
+                      <select
+                        value={movie.release_type || 'unknown'}
+                        onChange={async (e) => {
+                          await supabase
+                            .from('movies')
+                            .update({ release_type: e.target.value })
+                            .eq('id', movie.id);
+                          loadMovies();
+                        }}
+                        className="text-xs border rounded px-2 py-1"
+                      >
+                        {RELEASE_TYPES.map((type) => (
+                          <option key={type.value} value={type.value}>{type.label}</option>
+                        ))}
+                      </select>
                     </td>
                     <td className="p-4">
                       {movie.domestic_box_office > 0

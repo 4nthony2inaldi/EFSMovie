@@ -21,12 +21,15 @@ export interface Team {
   updated_at: string;
 }
 
+export type ReleaseType = 'wide' | 'limited' | 'streaming' | 'unknown';
+
 export interface Movie {
   id: string;
   title: string;
   release_date: string | null;
   release_month: number;
   release_year: number;
+  release_type: ReleaseType;
   tmdb_id: number | null;
   imdb_id: string | null;
   poster_url: string | null;

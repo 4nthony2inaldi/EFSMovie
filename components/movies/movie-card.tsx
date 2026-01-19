@@ -4,9 +4,16 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { formatScore, formatBoxOffice } from '@/lib/scoring';
 import { getScoreTier, MONTH_NAMES } from '@/types';
-import type { Movie } from '@/types';
+import type { Movie, ReleaseType } from '@/types';
 import { Badge } from '@/components/ui/badge';
-import { Film, Calendar, Star, Trophy } from 'lucide-react';
+import { Film, Calendar, Star, Monitor, Clapperboard } from 'lucide-react';
+
+const RELEASE_TYPE_CONFIG: Record<ReleaseType, { label: string; className: string }> = {
+  wide: { label: 'Wide', className: 'text-green-600' },
+  limited: { label: 'Limited', className: 'text-blue-600' },
+  streaming: { label: 'Streaming', className: 'text-purple-600' },
+  unknown: { label: '', className: '' },
+};
 
 interface MovieCardProps {
   movie: Movie;
@@ -47,9 +54,17 @@ export function MovieCard({ movie, ownerName, showOwner = true }: MovieCardProps
             <span className="truncate">{MONTH_NAMES[movie.release_month]} {movie.release_year}</span>
           </div>
 
-          {movie.genre && (
-            <p className="text-xs text-gray-500 mb-1.5 sm:mb-2 truncate">{movie.genre}</p>
-          )}
+          <div className="flex items-center gap-2 text-xs text-gray-500 mb-1.5 sm:mb-2">
+            {movie.genre && <span className="truncate">{movie.genre}</span>}
+            {movie.release_type && movie.release_type !== 'unknown' && (
+              <>
+                {movie.genre && <span>•</span>}
+                <span className={RELEASE_TYPE_CONFIG[movie.release_type].className}>
+                  {RELEASE_TYPE_CONFIG[movie.release_type].label}
+                </span>
+              </>
+            )}
+          </div>
 
           {showOwner && (
             <div className="mb-1.5 sm:mb-2">
