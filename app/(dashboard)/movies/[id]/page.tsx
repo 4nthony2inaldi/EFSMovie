@@ -19,6 +19,7 @@ import {
   ExternalLink,
   Play,
   ArrowLeft,
+  Building2,
 } from 'lucide-react';
 
 export default async function MovieDetailPage({
@@ -135,9 +136,18 @@ export default async function MovieDetailPage({
                     </p>
                   )}
                   {movie.cast_list && movie.cast_list.length > 0 && (
-                    <p className="text-gray-600 mb-4">
+                    <p className={`text-gray-600 ${movie.production_companies && movie.production_companies.length > 0 ? 'mb-2' : 'mb-4'}`}>
                       <span className="font-medium">Cast:</span>{' '}
                       {movie.cast_list.slice(0, 5).join(', ')}
+                    </p>
+                  )}
+                  {movie.production_companies && movie.production_companies.length > 0 && (
+                    <p className="text-gray-600 mb-4 flex items-start gap-1">
+                      <Building2 className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                      <span>
+                        <span className="font-medium">Studios:</span>{' '}
+                        {movie.production_companies.join(', ')}
+                      </span>
                     </p>
                   )}
 

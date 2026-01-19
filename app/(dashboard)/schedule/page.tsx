@@ -16,6 +16,7 @@ interface SearchParams {
   month?: string;
   genre?: string;
   release_type?: string;
+  studio?: string;
 }
 
 export default async function SchedulePage({
@@ -54,6 +55,10 @@ export default async function SchedulePage({
 
   if (params.release_type) {
     query = query.eq('release_type', params.release_type);
+  }
+
+  if (params.studio) {
+    query = query.contains('production_companies', [params.studio]);
   }
 
   // Then apply tab-specific filters and ordering
@@ -127,6 +132,19 @@ export default async function SchedulePage({
     }
   });
 
+  // Get unique production companies for filter dropdown
+  const { data: allMoviesForStudios } = await supabase
+    .from('movies')
+    .select('production_companies');
+
+  const studioSet = new Set<string>();
+  (allMoviesForStudios || []).forEach((m) => {
+    if (m.production_companies) {
+      m.production_companies.forEach((company: string) => studioSet.add(company));
+    }
+  });
+  const studios = Array.from(studioSet).sort();
+
   const displayMovies = tab === 'my' ? myMovies : (movies || []);
 
   // Build tab URLs that preserve filter params
@@ -138,6 +156,7 @@ export default async function SchedulePage({
       if (params.month) searchParams.set('month', params.month);
       if (params.genre) searchParams.set('genre', params.genre);
       if (params.release_type) searchParams.set('release_type', params.release_type);
+      if (params.studio) searchParams.set('studio', params.studio);
     }
     return `/schedule?${searchParams.toString()}`;
   };
@@ -217,6 +236,18 @@ export default async function SchedulePage({
                 <option value="wide">Wide</option>
                 <option value="limited">Limited</option>
                 <option value="streaming">Streaming</option>
+              </select>
+              <select
+                name="studio"
+                defaultValue={params.studio}
+                className="input w-auto"
+              >
+                <option value="">All Studios</option>
+                {studios.map((studio) => (
+                  <option key={studio} value={studio}>
+                    {studio}
+                  </option>
+                ))}
               </select>
               <button type="submit" className="btn-primary">
                 Filter

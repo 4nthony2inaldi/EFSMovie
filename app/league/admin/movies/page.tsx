@@ -23,6 +23,7 @@ interface Movie {
   tmdb_id?: number;
   imdb_id?: string;
   box_office_updated_at?: string;
+  production_companies?: string[] | null;
 }
 
 const RELEASE_TYPES: { value: ReleaseType; label: string }[] = [
@@ -59,6 +60,7 @@ export default function LeagueMoviesPage() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [filterMonth, setFilterMonth] = useState<number | ''>('');
+  const [filterStudio, setFilterStudio] = useState('');
 
   // TMDB state
   const [tmdbMovies, setTmdbMovies] = useState<TMDBMovie[]>([]);
@@ -469,10 +471,20 @@ export default function LeagueMoviesPage() {
     alert(message);
   }
 
+  // Get unique studios from movies
+  const studioSet = new Set<string>();
+  movies.forEach((movie) => {
+    if (movie.production_companies) {
+      movie.production_companies.forEach((company) => studioSet.add(company));
+    }
+  });
+  const studios = Array.from(studioSet).sort();
+
   const filteredMovies = movies.filter((movie) => {
     const matchesSearch = movie.title.toLowerCase().includes(search.toLowerCase());
     const matchesMonth = filterMonth === '' || movie.release_month === filterMonth;
-    return matchesSearch && matchesMonth;
+    const matchesStudio = filterStudio === '' || (movie.production_companies && movie.production_companies.includes(filterStudio));
+    return matchesSearch && matchesMonth && matchesStudio;
   });
 
   if (loading) {
@@ -694,8 +706,8 @@ export default function LeagueMoviesPage() {
       )}
 
       {/* Search and Filter */}
-      <div className="flex gap-4 mb-6">
-        <div className="flex-1 relative">
+      <div className="flex flex-wrap gap-4 mb-6">
+        <div className="flex-1 min-w-[200px] relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
@@ -708,11 +720,21 @@ export default function LeagueMoviesPage() {
         <select
           value={filterMonth}
           onChange={(e) => setFilterMonth(e.target.value === '' ? '' : parseInt(e.target.value))}
-          className="input w-48"
+          className="input w-auto"
         >
           <option value="">All months</option>
           {MONTHS.map((month, i) => (
             <option key={i} value={i + 1}>{month}</option>
+          ))}
+        </select>
+        <select
+          value={filterStudio}
+          onChange={(e) => setFilterStudio(e.target.value)}
+          className="input w-auto"
+        >
+          <option value="">All studios</option>
+          {studios.map((studio) => (
+            <option key={studio} value={studio}>{studio}</option>
           ))}
         </select>
       </div>

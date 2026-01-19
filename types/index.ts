@@ -41,6 +41,7 @@ export interface Movie {
   cast_list: string[] | null;
   synopsis: string | null;
   trailer_url: string | null;
+  production_companies: string[] | null;
   domestic_box_office: number;
   theater_count: number;
   metacritic_score: number | null;

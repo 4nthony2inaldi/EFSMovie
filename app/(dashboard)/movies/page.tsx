@@ -14,6 +14,7 @@ interface SearchParams {
   search?: string;
   genre?: string;
   release_type?: string;
+  studio?: string;
 }
 
 export default async function MoviesPage({
@@ -55,7 +56,24 @@ export default async function MoviesPage({
     query = query.eq('release_type', params.release_type);
   }
 
+  if (params.studio) {
+    query = query.contains('production_companies', [params.studio]);
+  }
+
   const { data: movies } = await query;
+
+  // Get unique production companies for filter dropdown
+  const { data: allMovies } = await supabase
+    .from('movies')
+    .select('production_companies');
+
+  const studioSet = new Set<string>();
+  (allMovies || []).forEach((m) => {
+    if (m.production_companies) {
+      m.production_companies.forEach((company: string) => studioSet.add(company));
+    }
+  });
+  const studios = Array.from(studioSet).sort();
 
   // Get ownership info
   const { data: teamMovies } = await supabase
@@ -154,6 +172,20 @@ export default async function MoviesPage({
               <option value="wide">Wide</option>
               <option value="limited">Limited</option>
               <option value="streaming">Streaming</option>
+            </select>
+
+            {/* Studio Filter */}
+            <select
+              name="studio"
+              defaultValue={params.studio}
+              className="input flex-1 sm:flex-none sm:w-auto min-w-0"
+            >
+              <option value="">All Studios</option>
+              {studios.map((studio) => (
+                <option key={studio} value={studio}>
+                  {studio}
+                </option>
+              ))}
             </select>
 
             {/* Owner Filter */}
