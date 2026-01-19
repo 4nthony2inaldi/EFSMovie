@@ -8,6 +8,9 @@ import { formatDate, getMonthName, isPast, isFuture } from '@/lib/utils';
 import { Calendar, Film, Clock, Gavel } from 'lucide-react';
 import Link from 'next/link';
 
+// Force dynamic rendering to ensure filters work correctly
+export const dynamic = 'force-dynamic';
+
 interface SearchParams {
   tab?: string;
   month?: string;
@@ -39,6 +42,21 @@ export default async function SchedulePage({
 
   let query = supabase.from('movies').select('*');
 
+  // Apply user filters FIRST (before tab-specific filters)
+  // This ensures filters work correctly with all tabs
+  if (params.month) {
+    query = query.eq('release_month', parseInt(params.month));
+  }
+
+  if (params.genre) {
+    query = query.ilike('genre', `%${params.genre}%`);
+  }
+
+  if (params.release_type) {
+    query = query.eq('release_type', params.release_type);
+  }
+
+  // Then apply tab-specific filters and ordering
   if (tab === 'upcoming') {
     // Movies releasing in next 3 months
     query = query
@@ -82,21 +100,6 @@ export default async function SchedulePage({
     }
   }
 
-  // Apply month filter
-  if (params.month) {
-    query = query.eq('release_month', parseInt(params.month));
-  }
-
-  // Apply genre filter
-  if (params.genre) {
-    query = query.ilike('genre', `%${params.genre}%`);
-  }
-
-  // Apply release type filter
-  if (params.release_type) {
-    query = query.eq('release_type', params.release_type);
-  }
-
   const { data: movies } = await query;
 
   // Get ownership for my movies tab
@@ -126,25 +129,38 @@ export default async function SchedulePage({
 
   const displayMovies = tab === 'my' ? myMovies : (movies || []);
 
+  // Build tab URLs that preserve filter params
+  const buildTabUrl = (tabName: string) => {
+    const searchParams = new URLSearchParams();
+    searchParams.set('tab', tabName);
+    // Preserve filter params when switching tabs (except for 'my' tab which doesn't use filters)
+    if (tabName !== 'my') {
+      if (params.month) searchParams.set('month', params.month);
+      if (params.genre) searchParams.set('genre', params.genre);
+      if (params.release_type) searchParams.set('release_type', params.release_type);
+    }
+    return `/schedule?${searchParams.toString()}`;
+  };
+
   return (
     <>
       <Header title="Schedule" subtitle="Movie release schedule" />
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-2 mb-6">
-        <TabButton href="/schedule?tab=upcoming" active={tab === 'upcoming'}>
+        <TabButton href={buildTabUrl('upcoming')} active={tab === 'upcoming'}>
           <Calendar className="h-4 w-4" />
           Upcoming
         </TabButton>
-        <TabButton href="/schedule?tab=theaters" active={tab === 'theaters'}>
+        <TabButton href={buildTabUrl('theaters')} active={tab === 'theaters'}>
           <Film className="h-4 w-4" />
           Now in Theaters
         </TabButton>
-        <TabButton href="/schedule?tab=my" active={tab === 'my'}>
+        <TabButton href={buildTabUrl('my')} active={tab === 'my'}>
           <Clock className="h-4 w-4" />
           My Movies
         </TabButton>
-        <TabButton href="/schedule?tab=auction" active={tab === 'auction'}>
+        <TabButton href={buildTabUrl('auction')} active={tab === 'auction'}>
           <Gavel className="h-4 w-4" />
           Next Auction
         </TabButton>

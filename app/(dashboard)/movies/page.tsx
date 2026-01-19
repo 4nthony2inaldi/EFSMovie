@@ -5,6 +5,9 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Film } from 'lucide-react';
 import { MONTH_NAMES } from '@/types';
 
+// Force dynamic rendering to ensure filters work correctly
+export const dynamic = 'force-dynamic';
+
 interface SearchParams {
   month?: string;
   owner?: string;
