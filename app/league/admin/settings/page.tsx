@@ -10,6 +10,8 @@ interface League {
   slug: string | null;
   name: string;
   season_year: number;
+  season_end_month: number;
+  season_end_year: number;
   status: string;
   join_password: string | null;
   max_teams: number;
@@ -28,6 +30,8 @@ export default function LeagueSettingsPage() {
   const [slug, setSlug] = useState('');
   const [slugError, setSlugError] = useState<string | null>(null);
   const [seasonYear, setSeasonYear] = useState(2026);
+  const [seasonEndMonth, setSeasonEndMonth] = useState(12);
+  const [seasonEndYear, setSeasonEndYear] = useState(2026);
   const [joinPassword, setJoinPassword] = useState('');
   const [maxTeams, setMaxTeams] = useState(12);
   const [status, setStatus] = useState('active');
@@ -51,6 +55,8 @@ export default function LeagueSettingsPage() {
       setName(data.name);
       setSlug(data.slug || '');
       setSeasonYear(data.season_year);
+      setSeasonEndMonth(data.season_end_month || 12);
+      setSeasonEndYear(data.season_end_year || data.season_year);
       setJoinPassword(data.join_password || '');
       setMaxTeams(data.max_teams || 12);
       setStatus(data.status);
@@ -99,6 +105,8 @@ export default function LeagueSettingsPage() {
         name,
         slug: slug || null,
         season_year: seasonYear,
+        season_end_month: seasonEndMonth,
+        season_end_year: seasonEndYear,
         join_password: joinPassword || null,
         max_teams: maxTeams,
         status,
@@ -178,6 +186,42 @@ export default function LeagueSettingsPage() {
                   required
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="label">Season End Date (Final Auction Month)</label>
+              <div className="grid grid-cols-2 gap-4">
+                <select
+                  value={seasonEndMonth}
+                  onChange={(e) => setSeasonEndMonth(parseInt(e.target.value))}
+                  className="input"
+                >
+                  <option value={1}>January</option>
+                  <option value={2}>February</option>
+                  <option value={3}>March</option>
+                  <option value={4}>April</option>
+                  <option value={5}>May</option>
+                  <option value={6}>June</option>
+                  <option value={7}>July</option>
+                  <option value={8}>August</option>
+                  <option value={9}>September</option>
+                  <option value={10}>October</option>
+                  <option value={11}>November</option>
+                  <option value={12}>December</option>
+                </select>
+                <input
+                  type="number"
+                  value={seasonEndYear}
+                  onChange={(e) => setSeasonEndYear(parseInt(e.target.value))}
+                  className="input"
+                  min={2024}
+                  max={2030}
+                  required
+                />
+              </div>
+              <p className="text-sm text-gray-500 mt-1">
+                The last month that will have an auction. Teams must budget for all auctions until this date.
+              </p>
             </div>
 
             <div>

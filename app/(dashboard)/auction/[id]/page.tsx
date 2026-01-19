@@ -13,6 +13,7 @@ import { formatCurrency, getMonthName, formatDate } from '@/lib/utils';
 import { formatScore } from '@/lib/scoring';
 import { cn } from '@/lib/utils';
 import type { Auction, Movie, Bid, Team, ReleaseType } from '@/types';
+import { MONTH_NAMES } from '@/types';
 import {
   ArrowLeft,
   Film,
@@ -42,6 +43,8 @@ export default function AuctionDetailPage({
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [results, setResults] = useState<any[] | null>(null);
   const [teamCount, setTeamCount] = useState(0);
+  const [seasonEndMonth, setSeasonEndMonth] = useState<number | null>(null);
+  const [seasonEndYear, setSeasonEndYear] = useState<number | null>(null);
 
   // Load auction data
   useEffect(() => {
@@ -67,21 +70,23 @@ export default function AuctionDetailPage({
       // Get auction with league info
       const { data: auctionData } = await supabase
         .from('auctions')
-        .select('*, league:leagues(id)')
+        .select('*, league:leagues(id, season_end_month, season_end_year)')
         .eq('id', auctionId)
         .single();
 
       if (!auctionData) return;
       setAuction(auctionData);
 
-      // Get team count in league
-      const leagueId = (auctionData.league as { id: string })?.id;
-      if (leagueId) {
+      // Get team count and season end from league
+      const league = auctionData.league as { id: string; season_end_month: number; season_end_year: number } | null;
+      if (league) {
         const { count } = await supabase
           .from('teams')
           .select('*', { count: 'exact', head: true })
-          .eq('league_id', leagueId);
+          .eq('league_id', league.id);
         setTeamCount(count || 0);
+        setSeasonEndMonth(league.season_end_month);
+        setSeasonEndYear(league.season_end_year);
       }
 
       // Get auction movies
@@ -245,6 +250,26 @@ export default function AuctionDetailPage({
   const nonZeroBidCount = Array.from(bids.values()).filter((b) => b > 0).length;
   const minRequiredBids = teamCount * 2;
   const hasEnoughBids = nonZeroBidCount >= minRequiredBids;
+
+  // Calculate remaining auctions and movies needed for the season
+  const calculateRemainingMovies = () => {
+    if (!auction || !seasonEndMonth || !seasonEndYear) return null;
+
+    const currentMonth = auction.for_month;
+    const currentYear = auction.for_year;
+
+    // Calculate months remaining (including current auction)
+    const currentMonthsFromEpoch = currentYear * 12 + currentMonth;
+    const endMonthsFromEpoch = seasonEndYear * 12 + seasonEndMonth;
+    const remainingAuctions = Math.max(0, endMonthsFromEpoch - currentMonthsFromEpoch + 1);
+
+    return {
+      remainingAuctions,
+      remainingMovies: remainingAuctions * 2,
+    };
+  };
+
+  const seasonProgress = calculateRemainingMovies();
 
   // Show results if resolved
   if (auction.status === 'resolved' && results) {
@@ -522,6 +547,28 @@ export default function AuctionDetailPage({
                 </p>
               </CardContent>
             </Card>
+
+            {/* Season Progress */}
+            {seasonProgress && seasonEndMonth && seasonEndYear && (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-sm font-medium text-gray-700 mb-3">Season Progress</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-purple-50 rounded-lg p-3 text-center">
+                      <div className="text-2xl font-bold text-purple-600">{seasonProgress.remainingAuctions}</div>
+                      <div className="text-xs text-purple-700">Auctions Left</div>
+                    </div>
+                    <div className="bg-blue-50 rounded-lg p-3 text-center">
+                      <div className="text-2xl font-bold text-blue-600">{seasonProgress.remainingMovies}</div>
+                      <div className="text-xs text-blue-700">Movies to Pick</div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-3">
+                    Season ends {MONTH_NAMES[seasonEndMonth]} {seasonEndYear}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       )}

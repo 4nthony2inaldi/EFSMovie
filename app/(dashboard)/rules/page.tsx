@@ -1,5 +1,10 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 import { Header } from '@/components/layout/header';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { MONTH_NAMES } from '@/types';
 import {
   Calculator,
   DollarSign,
@@ -12,9 +17,33 @@ import {
   ArrowRight,
   Info,
   Award,
+  Calendar,
 } from 'lucide-react';
 
 export default function RulesPage() {
+  const supabase = createClient();
+  const [seasonEndMonth, setSeasonEndMonth] = useState<number | null>(null);
+  const [seasonEndYear, setSeasonEndYear] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function loadLeague() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: team } = await supabase
+        .from('teams')
+        .select('league:leagues(season_end_month, season_end_year)')
+        .eq('user_id', user.id)
+        .single();
+
+      if (team?.league) {
+        const league = team.league as { season_end_month: number; season_end_year: number };
+        setSeasonEndMonth(league.season_end_month);
+        setSeasonEndYear(league.season_end_year);
+      }
+    }
+    loadLeague();
+  }, [supabase]);
   return (
     <>
       <Header
@@ -283,6 +312,29 @@ export default function RulesPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Season Info */}
+      {seasonEndMonth && seasonEndYear && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-purple-600" />
+              Season Timeline
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-purple-50 rounded-xl p-6 text-center">
+              <div className="text-sm text-purple-600 font-medium mb-1">Final Auction Month</div>
+              <div className="text-3xl font-bold text-purple-900">
+                {MONTH_NAMES[seasonEndMonth]} {seasonEndYear}
+              </div>
+              <p className="text-sm text-purple-700 mt-2">
+                Plan your budget to last through all auctions until this date.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Auction System */}
       <Card className="mb-6">

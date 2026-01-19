@@ -5,6 +5,8 @@ export interface League {
   slug: string | null;
   name: string;
   season_year: number;
+  season_end_month: number;
+  season_end_year: number;
   status: 'active' | 'completed' | 'frozen';
   scores_frozen_at: string | null;
   created_at: string;
