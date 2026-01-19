@@ -5,7 +5,7 @@ import { Header } from '@/components/layout/header';
 import { ScoreBreakdown } from '@/components/movies/score-breakdown';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatScore, formatBoxOffice, formatTheaters } from '@/lib/scoring';
+import { formatScore, formatBoxOffice, formatTheaters, formatMetacritic } from '@/lib/scoring';
 import { formatDate, formatCurrency, getMonthName } from '@/lib/utils';
 import { getScoreTier } from '@/types';
 import {
@@ -209,7 +209,7 @@ export default async function MovieDetailPage({
               <StatRow
                 icon={<Star className="h-5 w-5 text-gold-500" />}
                 label="Metacritic"
-                value={movie.metacritic_score?.toString() || '-'}
+                value={formatMetacritic(movie.metacritic_score)}
               />
               {movie.rotten_tomatoes_score && (
                 <StatRow

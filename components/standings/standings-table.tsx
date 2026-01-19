@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { formatCurrency, formatNumber } from '@/lib/utils';
-import { formatScore, formatBoxOffice } from '@/lib/scoring';
+import { formatScore, formatBoxOffice, formatMetacritic } from '@/lib/scoring';
 import { getScoreTier } from '@/types';
 import type { TeamStanding, Movie, TeamMovie } from '@/types';
 import { Avatar } from '@/components/ui/avatar';
@@ -97,7 +97,7 @@ export function StandingsTable({ standings }: StandingsTableProps) {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Avg Rating</span>
-                    <span className="text-gray-700">{team.avg_rating.toFixed(1)}</span>
+                    <span className="text-gray-700">{formatMetacritic(team.avg_rating)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Oscar Points</span>

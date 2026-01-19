@@ -33,7 +33,9 @@ export function calculateMovieScore(stats: MovieStats): ScoreBreakdown {
     bestPictureWon,
   } = stats;
 
-  const metacritic = metacriticScore ?? 0;
+  // Metacritic is stored as decimal (0.85 for 85%), convert to 0-100 for calculations
+  const metacriticDecimal = metacriticScore ?? 0;
+  const metacritic = metacriticDecimal * 100;
 
   // Box office component (must be in 5+ theaters)
   let boxOfficeComponent = 0;
@@ -111,4 +113,13 @@ export function formatBoxOffice(amount: number | null | undefined): string {
 export function formatTheaters(count: number | null | undefined): string {
   if (count == null) return '-';
   return count.toLocaleString();
+}
+
+/**
+ * Format metacritic score for display (stored as decimal, displayed as percentage)
+ * e.g., 0.85 -> "85%"
+ */
+export function formatMetacritic(score: number | null | undefined): string {
+  if (score == null || score === 0) return '-';
+  return `${Math.round(score * 100)}%`;
 }

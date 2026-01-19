@@ -31,9 +31,9 @@ export async function getMovieRatings(imdbId: string): Promise<{
 
   const data: OMDBMovie = await res.json();
 
-  // Parse Metacritic score
+  // Parse Metacritic score (store as decimal 0-1, e.g., 85 -> 0.85)
   const metacritic = data.Metascore && data.Metascore !== 'N/A'
-    ? parseInt(data.Metascore)
+    ? parseInt(data.Metascore) / 100
     : null;
 
   // Parse Rotten Tomatoes score

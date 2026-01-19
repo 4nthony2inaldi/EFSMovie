@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Avatar } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { MovieCard } from '@/components/movies/movie-card';
-import { formatScore, formatBoxOffice } from '@/lib/scoring';
+import { formatScore, formatBoxOffice, formatMetacritic } from '@/lib/scoring';
 import { formatCurrency, formatNumber, getMonthName } from '@/lib/utils';
 import {
   ArrowLeft,
@@ -154,7 +154,7 @@ export default async function TeamDetailPage({
               <StatRow
                 icon={<Star className="h-5 w-5 text-gold-500" />}
                 label="Avg Rating"
-                value={avgRating.toFixed(1)}
+                value={formatMetacritic(avgRating)}
               />
               <StatRow
                 icon={<Trophy className="h-5 w-5 text-gold-600" />}

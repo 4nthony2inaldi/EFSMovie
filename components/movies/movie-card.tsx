@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import { formatScore, formatBoxOffice } from '@/lib/scoring';
+import { formatScore, formatBoxOffice, formatMetacritic } from '@/lib/scoring';
 import { getScoreTier, MONTH_NAMES } from '@/types';
 import type { Movie, ReleaseType } from '@/types';
 import { Badge } from '@/components/ui/badge';
@@ -86,7 +86,7 @@ export function MovieCard({ movie, ownerName, showOwner = true }: MovieCardProps
             {movie.metacritic_score && (
               <span className="flex items-center gap-0.5 text-gray-600">
                 <Star className="h-3 w-3 text-gold-500" />
-                {movie.metacritic_score}
+                {formatMetacritic(movie.metacritic_score)}
               </span>
             )}
           </div>
