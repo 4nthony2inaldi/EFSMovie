@@ -50,7 +50,7 @@ export async function getMovieRatings(imdbId: string): Promise<{
   console.log(`OMDB data for ${imdbId}: Metascore=${data.Metascore}, parsed=${metacritic}`);
 
   // Parse Rotten Tomatoes score
-  const rtRating = data.Ratings?.find((r) => r.Source === 'Rotten Tomatoes');
+  const rtRating = data.Ratings?.find((r: { Source: string; Value: string }) => r.Source === 'Rotten Tomatoes');
   const rottenTomatoes = rtRating
     ? parseInt(rtRating.Value.replace('%', ''))
     : null;
