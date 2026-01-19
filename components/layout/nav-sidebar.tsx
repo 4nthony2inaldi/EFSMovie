@@ -15,6 +15,7 @@ import {
   X,
   ChevronRight,
   Shield,
+  BookOpen,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,7 @@ const navItems = [
   { href: '/teams', label: 'Teams', icon: Users },
   { href: '/auction', label: 'Auction', icon: Gavel },
   { href: '/schedule', label: 'Schedule', icon: Calendar },
+  { href: '/rules', label: 'Rules', icon: BookOpen },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
