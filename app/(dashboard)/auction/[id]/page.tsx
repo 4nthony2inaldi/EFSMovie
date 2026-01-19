@@ -23,6 +23,8 @@ import {
   Trophy,
   AlertTriangle,
   Send,
+  X,
+  Trash2,
 } from 'lucide-react';
 
 export default function AuctionDetailPage({
@@ -175,6 +177,16 @@ export default function AuctionDetailPage({
     setSubmitSuccess(false);
   };
 
+  // Clear a single bid
+  const handleClearBid = (movieId: string) => {
+    setBids((prev) => {
+      const next = new Map(prev);
+      next.delete(movieId);
+      return next;
+    });
+    setSubmitSuccess(false);
+  };
+
   // Check if there are unsaved changes
   const hasUnsavedChanges = useCallback(() => {
     if (bids.size !== savedBids.size) return true;
@@ -235,6 +247,26 @@ export default function AuctionDetailPage({
     setSubmitting(false);
     setSubmitSuccess(true);
     setTimeout(() => setSubmitSuccess(false), 3000);
+  };
+
+  // Unsubmit all bids
+  const unsubmitAllBids = async () => {
+    if (!team || !auctionId) return;
+
+    setSubmitting(true);
+
+    // Delete all bids for this auction and team
+    await supabase
+      .from('bids')
+      .delete()
+      .eq('auction_id', auctionId)
+      .eq('team_id', team.id);
+
+    // Clear local state
+    setBids(new Map());
+    setSavedBids(new Map());
+    setSubmitting(false);
+    setSubmitSuccess(false);
   };
 
   if (loading || !auction) {
@@ -473,27 +505,39 @@ export default function AuctionDetailPage({
                     </span>
                   )}
                 </div>
-                <button
-                  onClick={submitBids}
-                  disabled={submitting || isOverBudget || !hasEnoughBids || !hasUnsavedChanges()}
-                  className={cn(
-                    "flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-colors",
-                    isOverBudget
-                      ? "bg-red-100 text-red-700 cursor-not-allowed"
-                      : !hasEnoughBids
+                <div className="flex items-center gap-2">
+                  {savedBids.size > 0 && (
+                    <button
+                      onClick={unsubmitAllBids}
+                      disabled={submitting}
+                      className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="hidden sm:inline">Unsubmit All</span>
+                    </button>
+                  )}
+                  <button
+                    onClick={submitBids}
+                    disabled={submitting || isOverBudget || !hasEnoughBids || !hasUnsavedChanges()}
+                    className={cn(
+                      "flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-colors",
+                      isOverBudget
                         ? "bg-red-100 text-red-700 cursor-not-allowed"
-                        : hasUnsavedChanges()
-                          ? "bg-purple-600 text-white hover:bg-purple-700"
-                          : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  )}
-                >
-                  {submitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                  {submitting ? 'Submitting...' : isOverBudget ? 'Over Budget!' : !hasEnoughBids ? `Need ${minRequiredBids - nonZeroBidCount} More` : 'Submit Bids'}
-                </button>
+                        : !hasEnoughBids
+                          ? "bg-red-100 text-red-700 cursor-not-allowed"
+                          : hasUnsavedChanges()
+                            ? "bg-purple-600 text-white hover:bg-purple-700"
+                            : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    )}
+                  >
+                    {submitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    {submitting ? 'Submitting...' : isOverBudget ? 'Over Budget!' : !hasEnoughBids ? `Need ${minRequiredBids - nonZeroBidCount} More` : 'Submit Bids'}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -505,6 +549,7 @@ export default function AuctionDetailPage({
                 savedAmount={savedBids.get(movie.id) || 0}
                 maxBid={team?.budget_remaining || 0}
                 onBidChange={handleBidChange}
+                onClearBid={handleClearBid}
               />
             ))}
           </div>
@@ -563,6 +608,30 @@ export default function AuctionDetailPage({
                       <div className="text-xs text-blue-700">Movies to Pick</div>
                     </div>
                   </div>
+
+                  {/* Budget Strategy Helper */}
+                  {seasonProgress.remainingMovies > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <div className="text-xs font-medium text-gray-600 mb-2">Budget Strategy</div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-green-50 rounded-lg p-3 text-center">
+                          <div className="text-lg font-bold text-green-600">
+                            {formatCurrency(Math.max(0, (team?.budget_remaining || 0) - totalBids))}
+                          </div>
+                          <div className="text-xs text-green-700">Max Bid</div>
+                          <div className="text-xs text-green-600 opacity-75">all-in on one</div>
+                        </div>
+                        <div className="bg-amber-50 rounded-lg p-3 text-center">
+                          <div className="text-lg font-bold text-amber-600">
+                            {formatCurrency(Math.floor(Math.max(0, (team?.budget_remaining || 0) - totalBids) / seasonProgress.remainingMovies))}
+                          </div>
+                          <div className="text-xs text-amber-700">Avg Bid</div>
+                          <div className="text-xs text-amber-600 opacity-75">spread evenly</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <p className="text-xs text-gray-500 mt-3">
                     Season ends {MONTH_NAMES[seasonEndMonth]} {seasonEndYear}
                   </p>
@@ -604,12 +673,14 @@ function BidRow({
   savedAmount,
   maxBid,
   onBidChange,
+  onClearBid,
 }: {
   movie: Movie;
   bidAmount: number;
   savedAmount: number;
   maxBid: number;
   onBidChange: (movieId: string, amount: number) => void;
+  onClearBid: (movieId: string) => void;
 }) {
   const [value, setValue] = useState(bidAmount > 0 ? bidAmount.toString() : '');
 
@@ -622,7 +693,7 @@ function BidRow({
     const newValue = e.target.value;
     setValue(newValue);
 
-    const numValue = parseFloat(newValue) || 0;
+    const numValue = parseInt(newValue) || 0;
     if (numValue >= 0) {
       onBidChange(movie.id, numValue);
     }
@@ -683,7 +754,7 @@ function BidRow({
           <input
             type="number"
             min="0"
-            step="0.01"
+            step="1"
             value={value}
             onChange={handleChange}
             placeholder="0"
@@ -703,6 +774,20 @@ function BidRow({
             <Check className="h-4 w-4 text-green-500" />
           )}
         </div>
+
+        {/* Clear Button */}
+        {(bidAmount > 0 || savedAmount > 0) && (
+          <button
+            onClick={() => {
+              setValue('');
+              onClearBid(movie.id);
+            }}
+            className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+            title="Clear bid"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </div>
   );

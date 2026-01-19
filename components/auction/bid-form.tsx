@@ -57,7 +57,7 @@ export function BidForm({
     const value = e.target.value;
     setAmount(value);
 
-    const numValue = parseFloat(value) || 0;
+    const numValue = parseInt(value) || 0;
     if (numValue >= 0 && numValue <= maxBid) {
       onBidChange(movie.id, numValue);
       saveBid(numValue);
@@ -97,10 +97,10 @@ export function BidForm({
             type="number"
             min="0"
             max={maxBid}
-            step="0.01"
+            step="1"
             value={amount}
             onChange={handleChange}
-            placeholder="0.00"
+            placeholder="0"
             className={cn(
               'w-24 pl-7 pr-3 py-2 border rounded-lg text-right focus:outline-none focus:ring-2 focus:ring-purple-500',
               isOverBudget ? 'border-red-300 bg-red-50' : 'border-gray-300'
