@@ -2,6 +2,7 @@
 
 export interface League {
   id: string;
+  slug: string | null;
   name: string;
   season_year: number;
   status: 'active' | 'completed' | 'frozen';

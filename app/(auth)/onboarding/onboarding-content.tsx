@@ -142,24 +142,24 @@ export function OnboardingContent() {
         leagueId = inviteData[0].league_id;
         invitationId = inviteData[0].invitation_id;
       } else {
-        // Join via league ID + password
+        // Join via league ID/slug + password
         if (!joinLeagueId.trim()) {
           throw new Error('Please enter a league ID');
         }
 
-        // Validate the password
-        const { data: isValid, error: validError } = await supabase
-          .rpc('validate_league_password', {
-            p_league_id: joinLeagueId.trim(),
+        // Validate the password using v2 function that supports both UUID and slug
+        const { data: validLeagueId, error: validError } = await supabase
+          .rpc('validate_league_password_v2', {
+            p_league_identifier: joinLeagueId.trim(),
             p_password: joinPassword
           });
 
         if (validError) throw validError;
-        if (!isValid) {
+        if (!validLeagueId) {
           throw new Error('Invalid league ID or password');
         }
 
-        leagueId = joinLeagueId.trim();
+        leagueId = validLeagueId;
       }
 
       // Check if league has space
@@ -460,9 +460,12 @@ export function OnboardingContent() {
                     type="text"
                     value={joinLeagueId}
                     onChange={(e) => setJoinLeagueId(e.target.value)}
-                    className="input font-mono"
-                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    className="input"
+                    placeholder="my-league or UUID"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter the custom ID or full UUID from your commissioner
+                  </p>
                 </div>
                 <div>
                   <label htmlFor="joinPassword" className="label">Password</label>

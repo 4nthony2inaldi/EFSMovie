@@ -7,6 +7,7 @@ import { Settings, Loader2, Save, AlertTriangle } from 'lucide-react';
 
 interface League {
   id: string;
+  slug: string | null;
   name: string;
   season_year: number;
   status: string;
@@ -24,6 +25,8 @@ export default function LeagueSettingsPage() {
 
   // Form state
   const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [slugError, setSlugError] = useState<string | null>(null);
   const [seasonYear, setSeasonYear] = useState(2026);
   const [joinPassword, setJoinPassword] = useState('');
   const [maxTeams, setMaxTeams] = useState(12);
@@ -46,6 +49,7 @@ export default function LeagueSettingsPage() {
     if (data) {
       setLeague(data);
       setName(data.name);
+      setSlug(data.slug || '');
       setSeasonYear(data.season_year);
       setJoinPassword(data.join_password || '');
       setMaxTeams(data.max_teams || 12);
@@ -54,9 +58,36 @@ export default function LeagueSettingsPage() {
     setLoading(false);
   }
 
+  // Validate and format slug
+  function handleSlugChange(value: string) {
+    // Convert to lowercase and replace spaces/invalid chars with hyphens
+    const formatted = value
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    setSlug(formatted);
+
+    // Validate
+    if (formatted && formatted.length < 3) {
+      setSlugError('Must be at least 3 characters');
+    } else if (formatted && formatted.length > 32) {
+      setSlugError('Must be 32 characters or less');
+    } else {
+      setSlugError(null);
+    }
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!league) return;
+
+    // Validate slug before saving
+    if (slugError) {
+      setError('Please fix the League ID format');
+      return;
+    }
 
     setSaving(true);
     setError(null);
@@ -66,6 +97,7 @@ export default function LeagueSettingsPage() {
       .from('leagues')
       .update({
         name,
+        slug: slug || null,
         season_year: seasonYear,
         join_password: joinPassword || null,
         max_teams: maxTeams,
@@ -74,9 +106,18 @@ export default function LeagueSettingsPage() {
       .eq('id', league.id);
 
     if (updateError) {
-      setError(updateError.message);
+      // Check for unique constraint violation
+      if (updateError.message.includes('idx_leagues_slug_unique') ||
+          updateError.message.includes('duplicate') ||
+          updateError.code === '23505') {
+        setSlugError('This League ID is already taken');
+        setError('This League ID is already taken. Please choose a different one.');
+      } else {
+        setError(updateError.message);
+      }
     } else {
       setSuccess(true);
+      setLeague({ ...league, slug: slug || null });
       setTimeout(() => setSuccess(false), 3000);
     }
     setSaving(false);
@@ -137,6 +178,32 @@ export default function LeagueSettingsPage() {
                   required
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="label">Custom League ID (for sharing)</label>
+              <div className="flex items-center gap-2">
+                <span className="text-gray-500 text-sm">efsmovie.com/join/</span>
+                <input
+                  type="text"
+                  value={slug}
+                  onChange={(e) => handleSlugChange(e.target.value)}
+                  className={`input flex-1 ${slugError ? 'border-red-500' : ''}`}
+                  placeholder="my-league"
+                  maxLength={32}
+                />
+              </div>
+              {slugError && (
+                <p className="text-sm text-red-500 mt-1">{slugError}</p>
+              )}
+              <p className="text-sm text-gray-500 mt-1">
+                3-32 characters, lowercase letters, numbers, and hyphens only.
+                {!slug && league?.id && (
+                  <span className="block mt-1">
+                    Current: <code className="bg-gray-100 px-1 rounded text-xs">{league.id}</code>
+                  </span>
+                )}
+              </p>
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">

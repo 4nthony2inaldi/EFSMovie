@@ -47,14 +47,27 @@ export default async function LeagueAdminDashboardPage() {
         <CardContent>
           <div className="grid md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">League ID</label>
+              <label className="block text-sm font-medium text-gray-600 mb-1">
+                {league.slug ? 'Custom League ID' : 'League ID'}
+              </label>
               <div className="flex items-center gap-2">
                 <code className="flex-1 bg-gray-100 px-3 py-2 rounded-lg text-sm font-mono break-all">
-                  {league.id}
+                  {league.slug || league.id}
                 </code>
-                <CopyButton text={league.id} />
+                <CopyButton text={league.slug || league.id} />
               </div>
-              <p className="text-xs text-gray-500 mt-1">Share this with members along with the password</p>
+              {league.slug ? (
+                <p className="text-xs text-gray-500 mt-1">
+                  Share <strong>{league.slug}</strong> with members to join
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500 mt-1">
+                  <Link href="/league/admin/settings" className="text-purple-600 hover:underline">
+                    Set a custom League ID
+                  </Link>
+                  {' '}for easier sharing
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-600 mb-1">Join Password</label>
