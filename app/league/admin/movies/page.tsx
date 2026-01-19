@@ -77,7 +77,6 @@ export default function LeagueMoviesPage() {
     title: '',
     release_month: new Date().getMonth() + 1,
     release_year: new Date().getFullYear(),
-    release_type: 'unknown' as ReleaseType,
     poster_url: '',
     domestic_box_office: 0,
     theater_count: 0,
@@ -188,7 +187,6 @@ export default function LeagueMoviesPage() {
       title: formData.title,
       release_month: formData.release_month,
       release_year: formData.release_year,
-      release_type: formData.release_type,
       poster_url: formData.poster_url || null,
       domestic_box_office: formData.domestic_box_office || 0,
       theater_count: formData.theater_count || 0,
@@ -213,7 +211,6 @@ export default function LeagueMoviesPage() {
       title: '',
       release_month: new Date().getMonth() + 1,
       release_year: new Date().getFullYear(),
-      release_type: 'unknown',
       poster_url: '',
       domestic_box_office: 0,
       theater_count: 0,
@@ -226,7 +223,6 @@ export default function LeagueMoviesPage() {
       title: movie.title,
       release_month: movie.release_month,
       release_year: movie.release_year,
-      release_type: movie.release_type || 'unknown',
       poster_url: movie.poster_url || '',
       domestic_box_office: movie.domestic_box_office || 0,
       theater_count: movie.theater_count || 0,
@@ -751,18 +747,6 @@ export default function LeagueMoviesPage() {
                   />
                 </div>
                 <div>
-                  <label className="label">Release Type</label>
-                  <select
-                    value={formData.release_type}
-                    onChange={(e) => setFormData({ ...formData, release_type: e.target.value as ReleaseType })}
-                    className="input"
-                  >
-                    {RELEASE_TYPES.map((type) => (
-                      <option key={type.value} value={type.value}>{type.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
                   <label className="label">Box Office ($)</label>
                   <input
                     type="number"
@@ -871,21 +855,15 @@ export default function LeagueMoviesPage() {
                       {MONTHS[movie.release_month - 1]} {movie.release_year}
                     </td>
                     <td className="p-4">
-                      <select
-                        value={movie.release_type || 'unknown'}
-                        onChange={async (e) => {
-                          await supabase
-                            .from('movies')
-                            .update({ release_type: e.target.value })
-                            .eq('id', movie.id);
-                          loadMovies();
-                        }}
-                        className="text-xs border rounded px-2 py-1"
+                      <Badge
+                        variant={
+                          movie.release_type === 'wide' ? 'green' :
+                          movie.release_type === 'limited' ? 'purple' :
+                          movie.release_type === 'streaming' ? 'default' : 'gray'
+                        }
                       >
-                        {RELEASE_TYPES.map((type) => (
-                          <option key={type.value} value={type.value}>{type.label}</option>
-                        ))}
-                      </select>
+                        {RELEASE_TYPES.find(t => t.value === movie.release_type)?.label || 'Unknown'}
+                      </Badge>
                     </td>
                     <td className="p-4">
                       {movie.domestic_box_office > 0

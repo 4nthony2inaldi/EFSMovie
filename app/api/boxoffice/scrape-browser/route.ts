@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { scrapeBoxOfficeMojoBrowser } from '@/lib/scraper-browser';
 import { scrapeMetacriticScore } from '@/lib/boxofficemojo';
 import { tmdb } from '@/lib/tmdb';
+import type { ReleaseType } from '@/types';
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -14,6 +15,27 @@ function getSupabaseAdmin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
   return createClient(supabaseUrl, supabaseServiceKey);
+}
+
+// Determine release type based on theater count
+// Industry standards: Wide = 2000+ theaters, Limited = 1-1999 theaters
+function determineReleaseType(
+  theaterCount: number | null | undefined,
+  widestRelease: number | null | undefined,
+  hasTheatricalData: boolean
+): ReleaseType {
+  // Use widest release if available, otherwise use theater count
+  const maxTheaters = Math.max(theaterCount || 0, widestRelease || 0);
+
+  if (maxTheaters >= 2000) {
+    return 'wide';
+  } else if (maxTheaters > 0) {
+    return 'limited';
+  } else if (!hasTheatricalData) {
+    // No theatrical data found - likely streaming only
+    return 'streaming';
+  }
+  return 'unknown';
 }
 
 export async function POST(request: NextRequest) {
@@ -84,18 +106,36 @@ export async function POST(request: NextRequest) {
     const metacriticScore = title ? await scrapeMetacriticScore(title, releaseYear) : null;
 
     if (!data && metacriticScore === null) {
-      // Return success with skipped status - this is expected for non-theatrical releases
+      // No theatrical data - mark as streaming and return skipped status
+      const supabaseSkipped = getSupabaseAdmin();
+      await supabaseSkipped
+        .from('movies')
+        .update({
+          release_type: 'streaming',
+          box_office_updated_at: new Date().toISOString(),
+        })
+        .eq('id', movieId);
+
       return NextResponse.json({
         success: true,
         skipped: true,
-        reason: 'No theatrical data found (likely streaming/limited release)',
+        reason: 'No theatrical data found (marked as streaming release)',
         imdbId,
+        release_type: 'streaming',
       });
     }
+
+    // Determine release type from theater data
+    const releaseType = determineReleaseType(
+      data?.theater_count,
+      data?.widest_release,
+      !!data
+    );
 
     // Build update object
     const updateData: Record<string, unknown> = {
       box_office_updated_at: new Date().toISOString(),
+      release_type: releaseType,
     };
 
     if (data) {
@@ -138,6 +178,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       imdbId,
+      release_type: releaseType,
       data: {
         ...data,
         metacritic_score: metacriticScore,
@@ -207,16 +248,18 @@ export async function PUT(request: NextRequest) {
         // Scrape Metacritic score
         const metacriticScore = await scrapeMetacriticScore(movie.title, movie.release_year);
 
-        if (!boxOfficeData && metacriticScore === null) {
-          results.failed++;
-          results.errors.push(`${movie.title}: No data found`);
-          continue;
-        }
+        // Determine release type from theater data
+        const releaseType = determineReleaseType(
+          boxOfficeData?.theater_count,
+          boxOfficeData?.widest_release,
+          !!boxOfficeData
+        );
 
         // Build update object with only non-null values
         const updateData: Record<string, unknown> = {
           imdb_id: imdbId,
           box_office_updated_at: new Date().toISOString(),
+          release_type: releaseType,
         };
 
         if (boxOfficeData) {
