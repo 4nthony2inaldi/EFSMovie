@@ -476,33 +476,24 @@ export default function LeagueMoviesPage() {
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Movies</h1>
-        <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={handleDeleteAll}
-            disabled={bulkDeleting || movies.length === 0}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {bulkDeleting ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Trash2 className="h-4 w-4" />
-            )}
-            Delete All ({movies.length})
-          </button>
+    <div className="max-w-full overflow-x-hidden">
+      {/* Header - stacks on mobile */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Movies</h1>
+
+        {/* Action buttons - grid on mobile, flex on desktop */}
+        <div className="grid grid-cols-2 sm:flex gap-2">
           <button
             onClick={refreshAllBoxOffice}
             disabled={bulkRefreshing || movies.length === 0}
-            className="bg-green-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className="bg-green-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 text-sm"
           >
             {bulkRefreshing ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <DollarSign className="h-4 w-4" />
             )}
-            Refresh Box Office
+            <span className="hidden xs:inline">Refresh</span> Data
           </button>
           <button
             onClick={() => {
@@ -510,10 +501,10 @@ export default function LeagueMoviesPage() {
               setShowForm(false);
               loadTMDBMovies();
             }}
-            className="btn-secondary flex items-center gap-2"
+            className="btn-secondary flex items-center justify-center gap-1.5 text-sm px-3 py-2"
           >
             <Globe className="h-4 w-4" />
-            Browse TMDB
+            TMDB
           </button>
           <button
             onClick={() => {
@@ -522,10 +513,22 @@ export default function LeagueMoviesPage() {
               setShowForm(true);
               setShowTMDB(false);
             }}
-            className="btn-primary flex items-center gap-2"
+            className="btn-primary flex items-center justify-center gap-1.5 text-sm px-3 py-2"
           >
             <Plus className="h-4 w-4" />
-            Add Manual
+            Add
+          </button>
+          <button
+            onClick={handleDeleteAll}
+            disabled={bulkDeleting || movies.length === 0}
+            className="bg-red-600 text-white px-3 py-2 rounded-lg font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 text-sm"
+          >
+            {bulkDeleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+            Delete
           </button>
         </div>
       </div>
@@ -822,106 +825,111 @@ export default function LeagueMoviesPage() {
               <p className="text-sm mt-2">Click &quot;Browse TMDB&quot; to import real movies</p>
             </div>
           ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left p-4 font-semibold">Movie</th>
-                  <th className="text-left p-4 font-semibold">Release</th>
-                  <th className="text-left p-4 font-semibold">Type</th>
-                  <th className="text-left p-4 font-semibold">Box Office</th>
-                  <th className="text-left p-4 font-semibold">Theaters</th>
-                  <th className="text-left p-4 font-semibold">Score</th>
-                  <th className="text-right p-4 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredMovies.map((movie) => (
-                  <tr key={movie.id} className="border-b border-gray-100">
-                    <td className="p-4">
-                      <div className="flex items-center gap-3">
-                        {movie.poster_url ? (
-                          <img
-                            src={movie.poster_url}
-                            alt={movie.title}
-                            className="w-10 h-14 object-cover rounded"
-                          />
-                        ) : (
-                          <div className="w-10 h-14 bg-gray-200 rounded flex items-center justify-center">
-                            <Film className="h-5 w-5 text-gray-400" />
-                          </div>
-                        )}
-                        <span className="font-medium">{movie.title}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 text-gray-600">
-                      {MONTHS[movie.release_month - 1]} {movie.release_year}
-                    </td>
-                    <td className="p-4">
-                      <Badge
-                        variant={
-                          movie.release_type === 'wide' ? 'green' :
-                          movie.release_type === 'limited' ? 'purple' :
-                          movie.release_type === 'streaming' ? 'default' : 'gray'
-                        }
-                      >
-                        {RELEASE_TYPES.find(t => t.value === movie.release_type)?.label || 'Unknown'}
-                      </Badge>
-                    </td>
-                    <td className="p-4">
-                      {movie.domestic_box_office > 0
-                        ? formatCurrency(movie.domestic_box_office)
-                        : <span className="text-gray-400">-</span>
-                      }
-                    </td>
-                    <td className="p-4">
-                      {movie.theater_count
-                        ? movie.theater_count.toLocaleString()
-                        : <span className="text-gray-400">-</span>
-                      }
-                    </td>
-                    <td className="p-4">
-                      <Badge variant={movie.calculated_score > 500 ? 'green' : 'gray'}>
-                        {movie.calculated_score.toFixed(1)} pts
-                      </Badge>
-                    </td>
-                    <td className="p-4 text-right">
-                      <button
-                        onClick={() => refreshBoxOffice(movie)}
-                        disabled={refreshingIds.has(movie.id)}
-                        className="p-2 text-gray-400 hover:text-green-600 disabled:opacity-50"
-                        title="Quick refresh (box office + metacritic)"
-                      >
-                        {refreshingIds.has(movie.id) ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <RefreshCw className="h-4 w-4" />
-                        )}
-                      </button>
-                      <button
-                        onClick={() => refreshBoxOffice(movie, true)}
-                        disabled={refreshingIds.has(movie.id) || !movie.imdb_id}
-                        className="p-2 text-gray-400 hover:text-blue-600 disabled:opacity-50"
-                        title="Deep scrape with browser (gets theater count)"
-                      >
-                        <Download className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => startEdit(movie)}
-                        className="p-2 text-gray-400 hover:text-purple-600"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(movie.id)}
-                        className="p-2 text-gray-400 hover:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px]">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="text-left p-3 sm:p-4 font-semibold text-sm">Movie</th>
+                    <th className="text-left p-3 sm:p-4 font-semibold text-sm">Release</th>
+                    <th className="text-left p-3 sm:p-4 font-semibold text-sm">Type</th>
+                    <th className="text-left p-3 sm:p-4 font-semibold text-sm hidden sm:table-cell">Box Office</th>
+                    <th className="text-left p-3 sm:p-4 font-semibold text-sm hidden md:table-cell">Theaters</th>
+                    <th className="text-left p-3 sm:p-4 font-semibold text-sm">Score</th>
+                    <th className="text-right p-3 sm:p-4 font-semibold text-sm">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredMovies.map((movie) => (
+                    <tr key={movie.id} className="border-b border-gray-100">
+                      <td className="p-3 sm:p-4">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          {movie.poster_url ? (
+                            <img
+                              src={movie.poster_url}
+                              alt={movie.title}
+                              className="w-8 h-12 sm:w-10 sm:h-14 object-cover rounded flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-8 h-12 sm:w-10 sm:h-14 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
+                              <Film className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                            </div>
+                          )}
+                          <span className="font-medium text-sm sm:text-base truncate max-w-[120px] sm:max-w-none">{movie.title}</span>
+                        </div>
+                      </td>
+                      <td className="p-3 sm:p-4 text-gray-600 text-sm whitespace-nowrap">
+                        {MONTHS[movie.release_month - 1].slice(0, 3)} {movie.release_year}
+                      </td>
+                      <td className="p-3 sm:p-4">
+                        <Badge
+                          variant={
+                            movie.release_type === 'wide' ? 'green' :
+                            movie.release_type === 'limited' ? 'purple' :
+                            movie.release_type === 'streaming' ? 'default' : 'gray'
+                          }
+                        >
+                          {movie.release_type === 'wide' ? 'W' :
+                           movie.release_type === 'limited' ? 'L' :
+                           movie.release_type === 'streaming' ? 'S' : '?'}
+                          <span className="hidden sm:inline ml-1">
+                            {movie.release_type === 'wide' ? 'ide' :
+                             movie.release_type === 'limited' ? 'imited' :
+                             movie.release_type === 'streaming' ? 'treaming' : ''}
+                          </span>
+                        </Badge>
+                      </td>
+                      <td className="p-3 sm:p-4 hidden sm:table-cell text-sm">
+                        {movie.domestic_box_office > 0
+                          ? formatCurrency(movie.domestic_box_office)
+                          : <span className="text-gray-400">-</span>
+                        }
+                      </td>
+                      <td className="p-3 sm:p-4 hidden md:table-cell text-sm">
+                        {movie.theater_count
+                          ? movie.theater_count.toLocaleString()
+                          : <span className="text-gray-400">-</span>
+                        }
+                      </td>
+                      <td className="p-3 sm:p-4">
+                        <Badge variant={movie.calculated_score > 500 ? 'green' : 'gray'}>
+                          {movie.calculated_score.toFixed(1)}
+                        </Badge>
+                      </td>
+                      <td className="p-3 sm:p-4">
+                        <div className="flex items-center justify-end gap-0.5">
+                          <button
+                            onClick={() => refreshBoxOffice(movie, true)}
+                            disabled={refreshingIds.has(movie.id)}
+                            className="p-1.5 sm:p-2 text-gray-400 hover:text-green-600 disabled:opacity-50"
+                            title="Refresh data from BOM"
+                          >
+                            {refreshingIds.has(movie.id) ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => startEdit(movie)}
+                            className="p-1.5 sm:p-2 text-gray-400 hover:text-purple-600"
+                            title="Edit"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(movie.id)}
+                            className="p-1.5 sm:p-2 text-gray-400 hover:text-red-600"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </CardContent>
       </Card>
