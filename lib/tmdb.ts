@@ -154,8 +154,8 @@ class TMDBClient {
     let page = 1;
     let totalPages = 1;
 
-    // Fetch up to 3 pages (60 movies max per month)
-    while (page <= Math.min(totalPages, 3)) {
+    // Fetch all pages
+    while (page <= totalPages) {
       const response = await this.discoverByReleaseDates(startDate, endDate, page, {
         restrictReleaseType: isPast,
       });
