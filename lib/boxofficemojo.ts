@@ -205,8 +205,8 @@ export async function scrapeMetacriticScore(title: string, year?: number): Promi
       if (match) {
         const score = parseInt(match[1], 10);
         if (score >= 0 && score <= 100) {
-          // Return as decimal (80 -> 0.80)
-          return score / 100;
+          // Return raw score (0-100 scale)
+          return score;
         }
       }
     }
