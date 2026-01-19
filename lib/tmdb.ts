@@ -13,12 +13,20 @@ export interface TMDBMovie {
   popularity: number;
 }
 
+export interface TMDBProductionCompany {
+  id: number;
+  name: string;
+  logo_path: string | null;
+  origin_country: string;
+}
+
 export interface TMDBMovieDetails extends TMDBMovie {
   runtime: number | null;
   budget: number;
   revenue: number;
   imdb_id?: string;
   genres: { id: number; name: string }[];
+  production_companies?: TMDBProductionCompany[];
   credits?: {
     cast: { name: string; character: string; order: number }[];
     crew: { name: string; job: string }[];
@@ -218,6 +226,12 @@ class TMDBClient {
   static getTopCast(credits?: TMDBMovieDetails['credits'], limit = 5): string[] {
     if (!credits?.cast) return [];
     return credits.cast.slice(0, limit).map((c) => c.name);
+  }
+
+  // Helper to get production company names
+  static getProductionCompanies(companies?: TMDBProductionCompany[]): string[] {
+    if (!companies) return [];
+    return companies.map((c) => c.name);
   }
 }
 

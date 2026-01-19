@@ -32,6 +32,7 @@ export async function GET(
       director: TMDBClient.getDirector(movie.credits),
       cast_list: TMDBClient.getTopCast(movie.credits, 10),
       trailer_url: TMDBClient.getTrailerUrl(movie.videos),
+      production_companies: TMDBClient.getProductionCompanies(movie.production_companies),
       budget: movie.budget,
       revenue: movie.revenue,
       vote_average: movie.vote_average,

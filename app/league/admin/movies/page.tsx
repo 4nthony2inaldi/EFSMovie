@@ -161,6 +161,7 @@ export default function LeagueMoviesPage() {
         director: details.director,
         cast_list: details.cast_list,
         trailer_url: details.trailer_url,
+        production_companies: details.production_companies,
       });
 
       if (error) throw error;
@@ -308,6 +309,7 @@ export default function LeagueMoviesPage() {
           director: details.director,
           cast_list: details.cast_list,
           trailer_url: details.trailer_url,
+          production_companies: details.production_companies,
         });
 
         if (error) {
