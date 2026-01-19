@@ -80,6 +80,7 @@ export default function LeagueMoviesPage() {
   const [minVoteCount, setMinVoteCount] = useState(0);
   const [excludeDocumentaries, setExcludeDocumentaries] = useState(false);
   const [minRuntime, setMinRuntime] = useState(0);
+  const [limitToTop50, setLimitToTop50] = useState(false);
   const [tmdbMovieDetails, setTmdbMovieDetails] = useState<Map<number, string[]>>(new Map());
   const [fetchingStudioData, setFetchingStudioData] = useState(false);
 
@@ -199,9 +200,18 @@ export default function LeagueMoviesPage() {
     }
   }, [oscarStudiosOnly, majorStudiosOnly, tmdbMovies]);
 
-  // Calculate filtered movie count based on studio filters
+  // Get TMDB movies with top 50 filter applied (movies are already sorted by popularity)
+  function getFilteredTmdbMovies(): TMDBMovie[] {
+    if (limitToTop50) {
+      return tmdbMovies.slice(0, 50);
+    }
+    return tmdbMovies;
+  }
+
+  // Calculate filtered movie count based on all filters
   function getFilteredMovieCount(): number {
-    const notImported = tmdbMovies.filter(m => !importedIds.has(m.tmdb_id));
+    const filteredMovies = getFilteredTmdbMovies();
+    const notImported = filteredMovies.filter(m => !importedIds.has(m.tmdb_id));
 
     // If no studio filters, return all not-imported movies
     if (!oscarStudiosOnly && !majorStudiosOnly) {
@@ -387,7 +397,9 @@ export default function LeagueMoviesPage() {
   }
 
   async function importAllTMDBMovies() {
-    let moviesToImport = tmdbMovies.filter(m => !importedIds.has(m.tmdb_id));
+    // Apply top 50 filter first
+    const filteredTmdb = getFilteredTmdbMovies();
+    let moviesToImport = filteredTmdb.filter(m => !importedIds.has(m.tmdb_id));
     if (moviesToImport.length === 0) {
       alert('All movies are already imported!');
       return;
@@ -410,6 +422,7 @@ export default function LeagueMoviesPage() {
     }
 
     const filterNotes: string[] = [];
+    if (limitToTop50) filterNotes.push('Top 50 by popularity');
     if (majorStudiosOnly) filterNotes.push('Major studios only');
     if (oscarStudiosOnly) filterNotes.push('Oscar-caliber studios only');
     const filterNote = filterNotes.length > 0 ? `\n\nFiltering by: ${filterNotes.join(', ')}` : '';
@@ -835,6 +848,21 @@ export default function LeagueMoviesPage() {
                   </label>
                 </div>
               </div>
+              {/* Top 50 Filter */}
+              <div className="mt-3 pt-3 border-t border-blue-200">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={limitToTop50}
+                    onChange={(e) => setLimitToTop50(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Top 50 by Popularity
+                  </span>
+                  <span className="text-xs text-gray-500">(limits to most popular movies for the month)</span>
+                </label>
+              </div>
             </div>
 
             {/* Import Filters (applied during import) */}
@@ -898,8 +926,13 @@ export default function LeagueMoviesPage() {
                       </span> movies available to import
                     </>
                   )}
-                  {(majorStudiosOnly || oscarStudiosOnly || minVoteCount > 0 || minRuntime > 0 || excludeDocumentaries) && (
+                  {(majorStudiosOnly || oscarStudiosOnly || minVoteCount > 0 || minRuntime > 0 || excludeDocumentaries || limitToTop50) && (
                     <div className="flex flex-wrap gap-2 mt-1">
+                      {limitToTop50 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-purple-100 text-purple-700 text-xs">
+                          Top 50
+                        </span>
+                      )}
                       {minVoteCount > 0 && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs">
                           <ThumbsUp className="h-3 w-3" /> {minVoteCount}+ votes
@@ -974,7 +1007,7 @@ export default function LeagueMoviesPage() {
               </div>
             ) : (
               <div className="grid gap-3 max-h-[500px] overflow-y-auto">
-                {tmdbMovies.map((movie) => {
+                {getFilteredTmdbMovies().map((movie) => {
                   const isImported = importedIds.has(movie.tmdb_id);
                   const isImporting = importingIds.has(movie.tmdb_id);
 
