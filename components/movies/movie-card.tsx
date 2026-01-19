@@ -6,7 +6,7 @@ import { formatScore, formatBoxOffice, formatMetacritic } from '@/lib/scoring';
 import { getScoreTier, MONTH_NAMES } from '@/types';
 import type { Movie, ReleaseType } from '@/types';
 import { Badge } from '@/components/ui/badge';
-import { Film, Calendar, Star, Monitor, Clapperboard } from 'lucide-react';
+import { Film, Calendar, Star, TrendingUp, Rocket } from 'lucide-react';
 
 const RELEASE_TYPE_CONFIG: Record<ReleaseType, { label: string; className: string }> = {
   wide: { label: 'Wide', className: 'text-green-600' },
@@ -23,6 +23,21 @@ interface MovieCardProps {
 
 export function MovieCard({ movie, ownerName, showOwner = true }: MovieCardProps) {
   const scoreTier = getScoreTier(movie.calculated_score);
+
+  // Calculate achievement indicators
+  const theaterCount = movie.theater_count || 0;
+  const boxOffice = movie.domestic_box_office || 0;
+  const metacriticDecimal = movie.metacritic_score || 0;
+  const metacritic = metacriticDecimal * 100; // Convert to 0-100 scale
+
+  // Check if maxed out per-theater revenue ($15k/theater cap)
+  const perTheaterRevenue = theaterCount >= 5 ? (boxOffice / theaterCount) / 1000 : 0;
+  const isMaxedPerTheater = perTheaterRevenue >= 15;
+
+  // Check if raw score beat the metacritic floor
+  const boxOfficeComponent = theaterCount >= 5 ? Math.min(perTheaterRevenue, 15) : 0;
+  const rawBaseScore = boxOfficeComponent * metacritic;
+  const beatFloor = metacritic > 0 && rawBaseScore >= metacritic;
 
   return (
     <Link
@@ -77,7 +92,7 @@ export function MovieCard({ movie, ownerName, showOwner = true }: MovieCardProps
           )}
 
           {/* Stats */}
-          <div className="flex flex-wrap gap-1.5 sm:gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
             {movie.domestic_box_office > 0 && (
               <span className="text-gray-600">
                 {formatBoxOffice(movie.domestic_box_office)}
@@ -87,6 +102,17 @@ export function MovieCard({ movie, ownerName, showOwner = true }: MovieCardProps
               <span className="flex items-center gap-0.5 text-gray-600">
                 <Star className="h-3 w-3 text-gold-500" />
                 {formatMetacritic(movie.metacritic_score)}
+              </span>
+            )}
+            {/* Achievement indicators */}
+            {isMaxedPerTheater && (
+              <span className="flex items-center gap-0.5 text-green-600" title="Maxed $15k/theater">
+                <TrendingUp className="h-3.5 w-3.5" />
+              </span>
+            )}
+            {beatFloor && (
+              <span className="flex items-center gap-0.5 text-purple-600" title="Beat critic floor">
+                <Rocket className="h-3.5 w-3.5" />
               </span>
             )}
           </div>
