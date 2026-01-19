@@ -7,10 +7,11 @@ import { formatScore, formatBoxOffice } from '@/lib/scoring';
 import { getScoreTier } from '@/types';
 import type { TeamStanding, Movie, TeamMovie } from '@/types';
 import { Avatar } from '@/components/ui/avatar';
-import { Trophy, Medal, Award } from 'lucide-react';
+import { Trophy, Medal, Award, CheckCircle2, Clock } from 'lucide-react';
 
 interface TeamWithMovies extends TeamStanding {
   movies: (TeamMovie & { movie: Movie })[];
+  has_submitted_bids?: boolean;
 }
 
 interface StandingsTableProps {
@@ -47,9 +48,22 @@ export function StandingsTable({ standings }: StandingsTableProps) {
                       </div>
                     )}
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <h3 className="font-semibold text-gray-900 truncate">{team.team_name}</h3>
-                    <p className="text-sm text-gray-500">Rank #{team.rank}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-gray-500">Rank #{team.rank}</p>
+                      {team.has_submitted_bids !== undefined && (
+                        team.has_submitted_bids ? (
+                          <span className="flex items-center gap-1 text-xs text-green-600" title="Bids submitted">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-xs text-amber-600" title="Bids pending">
+                            <Clock className="h-3.5 w-3.5" />
+                          </span>
+                        )
+                      )}
+                    </div>
                   </div>
                 </div>
 
