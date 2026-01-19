@@ -53,7 +53,7 @@ export async function POST(
       if (team) {
         await adminSupabase
           .from('teams')
-          .update({ budget_remaining: team.budget_remaining + assignment.winning_bid })
+          .update({ budget_remaining: Number(team.budget_remaining) + Number(assignment.winning_bid) })
           .eq('id', assignment.team_id);
       }
     }

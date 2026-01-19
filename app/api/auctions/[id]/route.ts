@@ -52,7 +52,7 @@ export async function DELETE(
       if (team) {
         await adminSupabase
           .from('teams')
-          .update({ budget_remaining: team.budget_remaining + tm.winning_bid })
+          .update({ budget_remaining: Number(team.budget_remaining) + Number(tm.winning_bid) })
           .eq('id', tm.team_id);
       }
     }
