@@ -126,47 +126,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!data && metacriticScore === null) {
-      // No theatrical data - mark as streaming and return skipped status
-      const supabaseSkipped = getSupabaseAdmin();
-      await supabaseSkipped
-        .from('movies')
-        .update({
-          release_type: 'streaming',
-          box_office_updated_at: new Date().toISOString(),
-        })
-        .eq('id', movieId);
-
-      return NextResponse.json({
-        success: true,
-        skipped: true,
-        reason: 'No theatrical data found (marked as streaming release)',
-        imdbId,
-        release_type: 'streaming',
-      });
-    }
-
     // Determine release type - prefer BOM schedule data, fall back to theater count calculation
-    let releaseType: ReleaseType;
+    let releaseType: ReleaseType = 'unknown';
     if (data?.release_scale) {
       // Use authoritative release scale from BOM release schedule
       releaseType = data.release_scale;
       console.log(`Using release type from BOM schedule: ${releaseType}`);
-    } else {
+    } else if (data) {
       // Fall back to calculation from theater counts
       releaseType = determineReleaseType(
-        data?.theater_count,
-        data?.widest_release,
-        !!data
+        data.theater_count,
+        data.widest_release,
+        true
       );
       console.log(`Calculated release type from theaters: ${releaseType}`);
     }
+    // If no data at all, leave as 'unknown' - don't assume streaming just because data isn't available yet
 
-    // Build update object
+    // Build update object - only set release_type if we determined one
     const updateData: Record<string, unknown> = {
       box_office_updated_at: new Date().toISOString(),
-      release_type: releaseType,
     };
+
+    // Only update release_type if we found actual data to base it on
+    if (releaseType !== 'unknown' || data) {
+      updateData.release_type = releaseType;
+    }
 
     if (data) {
       if (data.domestic_box_office > 0) {
