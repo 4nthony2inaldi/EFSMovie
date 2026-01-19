@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { scrapeBoxOfficeMojoBrowser } from '@/lib/scraper-browser';
+import { scrapeMetacriticScore } from '@/lib/boxofficemojo';
 import { getMovieRatings } from '@/lib/api/omdb';
 import { tmdb } from '@/lib/tmdb';
 import type { ReleaseType } from '@/types';
@@ -112,9 +113,10 @@ export async function POST(request: NextRequest) {
     // Use multi-source scraper with title/year/month for release scale from BOM schedule
     const data = await scrapeBoxOfficeMojoBrowser(imdbId, title, releaseYear, releaseDate, month);
 
-    // Get Metacritic score from OMDB API (more reliable than scraping)
+    // Get Metacritic score - try OMDB first, fall back to scraping IMDB
     let metacriticScore: number | null = null;
     if (imdbId) {
+      // Try OMDB first (most reliable when available)
       try {
         const ratings = await getMovieRatings(imdbId);
         metacriticScore = ratings.metacritic;
@@ -123,6 +125,12 @@ export async function POST(request: NextRequest) {
         }
       } catch (e) {
         console.log(`OMDB ratings fetch failed for ${imdbId}:`, e);
+      }
+
+      // If OMDB doesn't have it, try scraping from IMDB page
+      if (!metacriticScore) {
+        console.log(`OMDB has no Metacritic for ${title}, trying IMDB scrape...`);
+        metacriticScore = await scrapeMetacriticScore(imdbId, title, releaseYear);
       }
     }
 
@@ -266,13 +274,21 @@ export async function PUT(request: NextRequest) {
           movie.release_month
         );
 
-        // Get Metacritic score from OMDB API (more reliable than scraping)
+        // Get Metacritic score - try OMDB first, fall back to scraping IMDB
         let metacriticScore: number | null = null;
         try {
           const ratings = await getMovieRatings(imdbId);
           metacriticScore = ratings.metacritic;
+          if (metacriticScore) {
+            console.log(`Got Metacritic ${metacriticScore} from OMDB for ${movie.title}`);
+          }
         } catch (e) {
           console.log(`OMDB ratings fetch failed for ${movie.title}:`, e);
+        }
+
+        // If OMDB doesn't have it, try scraping from IMDB page
+        if (!metacriticScore) {
+          metacriticScore = await scrapeMetacriticScore(imdbId, movie.title, movie.release_year);
         }
 
         // Determine release type - prefer BOM schedule data, fall back to theater count calculation

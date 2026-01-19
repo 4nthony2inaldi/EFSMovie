@@ -163,16 +163,57 @@ export async function scrapeBoxOfficeData(imdbId: string): Promise<BoxOfficeData
 }
 
 /**
- * Scrape Metacritic score for a movie
- * Note: This scraper is disabled due to unreliable results (wrong movies, false positives).
- * Metacritic scores should come from OMDB API instead which has proper data validation.
+ * Scrape Metacritic score from IMDB page (fallback when OMDB doesn't have data)
+ * Returns score as decimal (0-1), e.g., 81 -> 0.81
  */
-export async function scrapeMetacriticScore(title: string, year?: number): Promise<number | null> {
-  // Disabled: Metacritic scraping is unreliable - returns scores for wrong movies
-  // or picks up unrelated numbers when the actual score is "tbd".
-  // Use OMDB API (via /api/boxoffice/refresh) for reliable metacritic scores.
-  console.log(`Metacritic scraping disabled for ${title} - use OMDB API instead`);
-  return null;
+export async function scrapeMetacriticScore(imdbId: string, title: string, year?: number): Promise<number | null> {
+  // Try scraping from IMDB page which shows the Metascore
+  const url = `https://www.imdb.com/title/${imdbId}/`;
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      },
+    });
+
+    if (!response.ok) {
+      console.log(`IMDB fetch failed: ${response.status} for ${title}`);
+      return null;
+    }
+
+    const html = await response.text();
+
+    // Look for Metascore on IMDB page - it's usually in a span with score-meta class
+    // or in structured data
+    const scorePatterns = [
+      /metacriticScore[^}]*"ratingValue"\s*:\s*"?(\d+)"?/i,
+      /Metascore[^0-9]*(\d+)/i,
+      /"aggregateRating"[^}]*"ratingValue"\s*:\s*"?(\d+)"?[^}]*"Metacritic"/i,
+      /score-meta[^>]*>(\d+)</i,
+      /metacritic[^>]*>(\d+)</i,
+    ];
+
+    for (const pattern of scorePatterns) {
+      const match = html.match(pattern);
+      if (match) {
+        const score = parseInt(match[1], 10);
+        if (score >= 0 && score <= 100) {
+          console.log(`Scraped Metacritic ${score} from IMDB for ${title}`);
+          // Return as decimal
+          return score / 100;
+        }
+      }
+    }
+
+    console.log(`No Metacritic score found on IMDB for ${title}`);
+    return null;
+  } catch (error) {
+    console.error(`Error scraping IMDB for ${title}:`, error);
+    return null;
+  }
 }
 
 /**
