@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
-import { Film, Loader2, Plus, Pencil, Trash2, Search, Download, Globe, Check, X, RefreshCw, DollarSign } from 'lucide-react';
+import { hasOscarCaliberStudio } from '@/lib/constants';
+import { Film, Loader2, Plus, Pencil, Trash2, Search, Download, Globe, Check, X, RefreshCw, DollarSign, Award } from 'lucide-react';
 
 type ReleaseType = 'wide' | 'limited' | 'streaming' | 'unknown';
 
@@ -74,6 +75,8 @@ export default function LeagueMoviesPage() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
   const [bulkRefreshing, setBulkRefreshing] = useState(false);
+  const [oscarStudiosOnly, setOscarStudiosOnly] = useState(false);
+  const [tmdbMovieDetails, setTmdbMovieDetails] = useState<Map<number, string[]>>(new Map());
 
   const [formData, setFormData] = useState({
     title: '',
@@ -135,7 +138,7 @@ export default function LeagueMoviesPage() {
     setTmdbLoading(false);
   }
 
-  async function importTMDBMovie(tmdbMovie: TMDBMovie) {
+  async function importTMDBMovie(tmdbMovie: TMDBMovie, skipOscarCheck = false) {
     setImportingIds((prev) => new Set(prev).add(tmdbMovie.tmdb_id));
 
     try {
@@ -147,6 +150,25 @@ export default function LeagueMoviesPage() {
       // Fetch full details
       const detailsResponse = await fetch(`/api/tmdb/movie/${tmdbMovie.tmdb_id}`);
       const details = await detailsResponse.json();
+
+      // Store production companies for UI display
+      if (details.production_companies) {
+        setTmdbMovieDetails((prev) => {
+          const next = new Map(prev);
+          next.set(tmdbMovie.tmdb_id, details.production_companies);
+          return next;
+        });
+      }
+
+      // Check Oscar filter if enabled
+      if (oscarStudiosOnly && !skipOscarCheck && !hasOscarCaliberStudio(details.production_companies)) {
+        setImportingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(tmdbMovie.tmdb_id);
+          return next;
+        });
+        return { skipped: true, reason: 'no-oscar-studio' };
+      }
 
       // Insert into database
       const { error } = await supabase.from('movies').insert({
@@ -170,16 +192,18 @@ export default function LeagueMoviesPage() {
 
       setImportedIds((prev) => new Set(prev).add(tmdbMovie.tmdb_id));
       loadMovies();
+      return { skipped: false };
     } catch (error) {
       console.error('Failed to import movie:', error);
       alert('Failed to import movie');
+      return { skipped: false, error: true };
+    } finally {
+      setImportingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(tmdbMovie.tmdb_id);
+        return next;
+      });
     }
-
-    setImportingIds((prev) => {
-      const next = new Set(prev);
-      next.delete(tmdbMovie.tmdb_id);
-      return next;
-    });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -276,11 +300,13 @@ export default function LeagueMoviesPage() {
       return;
     }
 
-    if (!confirm(`Import all ${moviesToImport.length} movies?`)) return;
+    const filterNote = oscarStudiosOnly ? '\n\nNote: Only movies from Oscar-caliber studios will be imported.' : '';
+    if (!confirm(`Import all ${moviesToImport.length} movies?${filterNote}`)) return;
 
     setBulkImporting(true);
     let successCount = 0;
     let failCount = 0;
+    let skippedCount = 0;
     let lastError = '';
 
     for (const tmdbMovie of moviesToImport) {
@@ -295,6 +321,26 @@ export default function LeagueMoviesPage() {
         // Fetch full details
         const detailsResponse = await fetch(`/api/tmdb/movie/${tmdbMovie.tmdb_id}`);
         const details = await detailsResponse.json();
+
+        // Store production companies for UI display
+        if (details.production_companies) {
+          setTmdbMovieDetails((prev) => {
+            const next = new Map(prev);
+            next.set(tmdbMovie.tmdb_id, details.production_companies);
+            return next;
+          });
+        }
+
+        // Check Oscar filter if enabled
+        if (oscarStudiosOnly && !hasOscarCaliberStudio(details.production_companies)) {
+          skippedCount++;
+          setImportingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(tmdbMovie.tmdb_id);
+            return next;
+          });
+          continue;
+        }
 
         // Insert into database
         const { error } = await supabase.from('movies').insert({
@@ -337,9 +383,14 @@ export default function LeagueMoviesPage() {
     setBulkImporting(false);
     loadMovies();
 
-    if (failCount > 0) {
-      alert(`Import completed: ${successCount} succeeded, ${failCount} failed.\nLast error: ${lastError}\n\nIf all failed, you may need to add an INSERT policy in Supabase.`);
+    let message = `Import completed: ${successCount} imported`;
+    if (skippedCount > 0) {
+      message += `, ${skippedCount} skipped (no Oscar-caliber studio)`;
     }
+    if (failCount > 0) {
+      message += `, ${failCount} failed.\nLast error: ${lastError}\n\nIf all failed, you may need to add an INSERT policy in Supabase.`;
+    }
+    alert(message);
   }
 
   async function refreshBoxOffice(movie: Movie, useBrowser = false) {
@@ -571,7 +622,7 @@ export default function LeagueMoviesPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4 mb-4">
+            <div className="flex flex-wrap gap-4 mb-4">
               <select
                 value={tmdbMonth}
                 onChange={(e) => setTmdbMonth(parseInt(e.target.value))}
@@ -598,13 +649,28 @@ export default function LeagueMoviesPage() {
                 {tmdbLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                 Load Movies
               </button>
+              <label className="flex items-center gap-2 cursor-pointer ml-auto">
+                <input
+                  type="checkbox"
+                  checked={oscarStudiosOnly}
+                  onChange={(e) => setOscarStudiosOnly(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                />
+                <span className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                  <Award className="h-4 w-4 text-yellow-500" />
+                  Oscar Studios Only
+                </span>
+              </label>
             </div>
 
             {/* Import All Button */}
             {tmdbMovies.length > 0 && !tmdbLoading && !tmdbError && (
-              <div className="mb-4 p-3 bg-blue-50 rounded-lg flex items-center justify-between">
-                <span className="text-sm text-blue-700">
+              <div className={`mb-4 p-3 rounded-lg flex items-center justify-between ${oscarStudiosOnly ? 'bg-yellow-50' : 'bg-blue-50'}`}>
+                <span className={`text-sm ${oscarStudiosOnly ? 'text-yellow-700' : 'text-blue-700'}`}>
                   {tmdbMovies.filter(m => !importedIds.has(m.tmdb_id)).length} movies available to import
+                  {oscarStudiosOnly && (
+                    <span className="ml-1 font-medium">(filtering by Oscar-caliber studios)</span>
+                  )}
                 </span>
                 <button
                   onClick={importAllTMDBMovies}

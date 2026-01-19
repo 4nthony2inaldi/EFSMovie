@@ -48,6 +48,107 @@ export const ROUTES = {
   admin: '/admin',
 } as const;
 
+// Oscar-Caliber Studios
+// Studios with significant history of Oscar nominations/wins
+// Used to filter TMDB imports to movies with major studio backing
+export const OSCAR_CALIBER_STUDIOS = [
+  // Independent / Specialty (frequent Oscar contenders)
+  'A24',
+  'Searchlight Pictures',
+  'Fox Searchlight Pictures',
+  'Focus Features',
+  'Neon',
+  'Annapurna Pictures',
+  'Plan B Entertainment',
+  'Participant',
+  'Bleecker Street',
+  'Roadside Attractions',
+  'IFC Films',
+  'Magnolia Pictures',
+  'The Weinstein Company',
+  'Miramax',
+  'Miramax Films',
+
+  // Streaming Studios
+  'Netflix',
+  'Amazon Studios',
+  'Amazon MGM Studios',
+  'Apple Studios',
+  'Apple Original Films',
+  'Max',
+  'HBO Films',
+  'Hulu',
+
+  // Major Studios
+  'Universal Pictures',
+  'Warner Bros. Pictures',
+  'Warner Bros.',
+  'Paramount Pictures',
+  'Walt Disney Pictures',
+  'Walt Disney Studios',
+  'Disney',
+  'Sony Pictures',
+  'Columbia Pictures',
+  'TriStar Pictures',
+  '20th Century Studios',
+  '20th Century Fox',
+  'Twentieth Century Fox',
+  'Lionsgate',
+  'Lionsgate Films',
+  'Metro-Goldwyn-Mayer',
+  'MGM',
+  'New Line Cinema',
+  'DreamWorks Pictures',
+  'DreamWorks',
+  'DreamWorks Animation',
+  'Amblin Entertainment',
+
+  // International (Oscar history)
+  'StudioCanal',
+  'Studio Canal',
+  'Pathé',
+  'Gaumont',
+  'Film4 Productions',
+  'Film4',
+  'BBC Film',
+  'Working Title Films',
+  'Legendary Pictures',
+  'Legendary Entertainment',
+  'Lakeshore Entertainment',
+  'Village Roadshow Pictures',
+  'Regency Enterprises',
+  'New Regency',
+  'New Regency Productions',
+
+  // Production Companies (frequent Oscar nominees)
+  'Blumhouse Productions',
+  'Bad Robot Productions',
+  'Scott Free Productions',
+  'Imagine Entertainment',
+  'Skydance Media',
+  'Skydance',
+  'Chernin Entertainment',
+  'TSG Entertainment',
+  'Syncopy',
+  'Heyday Films',
+  'Bron Studios',
+  'BRON Studios',
+  'Killer Films',
+  'Big Beach',
+  'FilmNation Entertainment',
+] as const;
+
+// Helper to check if a movie has Oscar-caliber studio backing
+export function hasOscarCaliberStudio(productionCompanies: string[] | null | undefined): boolean {
+  if (!productionCompanies || productionCompanies.length === 0) return false;
+  return productionCompanies.some(company =>
+    OSCAR_CALIBER_STUDIOS.some(studio =>
+      company.toLowerCase().includes(studio.toLowerCase()) ||
+      studio.toLowerCase().includes(company.toLowerCase())
+    )
+  );
+}
+
 // Colors (for reference in components)
 export const COLORS = {
   purple: {
