@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { scrapeBoxOfficeMojoBrowser } from '@/lib/scraper-browser';
-import { scrapeMetacriticScore } from '@/lib/boxofficemojo';
+import { getMovieRatings } from '@/lib/api/omdb';
 import { tmdb } from '@/lib/tmdb';
 import type { ReleaseType } from '@/types';
 
@@ -112,8 +112,19 @@ export async function POST(request: NextRequest) {
     // Use multi-source scraper with title/year/month for release scale from BOM schedule
     const data = await scrapeBoxOfficeMojoBrowser(imdbId, title, releaseYear, releaseDate, month);
 
-    // Also scrape Metacritic score
-    const metacriticScore = title ? await scrapeMetacriticScore(title, releaseYear) : null;
+    // Get Metacritic score from OMDB API (more reliable than scraping)
+    let metacriticScore: number | null = null;
+    if (imdbId) {
+      try {
+        const ratings = await getMovieRatings(imdbId);
+        metacriticScore = ratings.metacritic;
+        if (metacriticScore) {
+          console.log(`Got Metacritic score from OMDB: ${metacriticScore}`);
+        }
+      } catch (e) {
+        console.log(`OMDB ratings fetch failed for ${imdbId}:`, e);
+      }
+    }
 
     if (!data && metacriticScore === null) {
       // No theatrical data - mark as streaming and return skipped status
@@ -270,8 +281,14 @@ export async function PUT(request: NextRequest) {
           movie.release_month
         );
 
-        // Scrape Metacritic score
-        const metacriticScore = await scrapeMetacriticScore(movie.title, movie.release_year);
+        // Get Metacritic score from OMDB API (more reliable than scraping)
+        let metacriticScore: number | null = null;
+        try {
+          const ratings = await getMovieRatings(imdbId);
+          metacriticScore = ratings.metacritic;
+        } catch (e) {
+          console.log(`OMDB ratings fetch failed for ${movie.title}:`, e);
+        }
 
         // Determine release type - prefer BOM schedule data, fall back to theater count calculation
         let releaseType: ReleaseType;

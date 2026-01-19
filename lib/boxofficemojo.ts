@@ -164,58 +164,15 @@ export async function scrapeBoxOfficeData(imdbId: string): Promise<BoxOfficeData
 
 /**
  * Scrape Metacritic score for a movie
+ * Note: This scraper is disabled due to unreliable results (wrong movies, false positives).
+ * Metacritic scores should come from OMDB API instead which has proper data validation.
  */
 export async function scrapeMetacriticScore(title: string, year?: number): Promise<number | null> {
-  // Format title for URL: lowercase, replace spaces with dashes, remove special chars
-  const formattedTitle = title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
-
-  const url = `https://www.metacritic.com/movie/${formattedTitle}/`;
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-      },
-    });
-
-    if (!response.ok) {
-      console.log(`Metacritic fetch failed: ${response.status} for ${title}`);
-      return null;
-    }
-
-    const html = await response.text();
-
-    // Look for metascore patterns
-    const scorePatterns = [
-      /metascore_w[^>]*>(\d+)</i,
-      /"ratingValue":\s*"?(\d+)"?/i,
-      /Metascore[^0-9]*(\d+)/i,
-      /<span[^>]*class="[^"]*metascore[^"]*"[^>]*>(\d+)/i,
-      /data-metascore="(\d+)"/i,
-    ];
-
-    for (const pattern of scorePatterns) {
-      const match = html.match(pattern);
-      if (match) {
-        const score = parseInt(match[1], 10);
-        if (score >= 0 && score <= 100) {
-          // Return raw score (0-100 scale)
-          return score;
-        }
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error(`Error scraping Metacritic for ${title}:`, error);
-    return null;
-  }
+  // Disabled: Metacritic scraping is unreliable - returns scores for wrong movies
+  // or picks up unrelated numbers when the actual score is "tbd".
+  // Use OMDB API (via /api/boxoffice/refresh) for reliable metacritic scores.
+  console.log(`Metacritic scraping disabled for ${title} - use OMDB API instead`);
+  return null;
 }
 
 /**
