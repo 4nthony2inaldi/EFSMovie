@@ -81,6 +81,7 @@ export default function LeagueMoviesPage() {
   const [excludeDocumentaries, setExcludeDocumentaries] = useState(false);
   const [minRuntime, setMinRuntime] = useState(0);
   const [tmdbMovieDetails, setTmdbMovieDetails] = useState<Map<number, string[]>>(new Map());
+  const [fetchingStudioData, setFetchingStudioData] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -156,6 +157,70 @@ export default function LeagueMoviesPage() {
       setTmdbError('Network error - failed to connect to TMDB');
     }
     setTmdbLoading(false);
+  }
+
+  // Fetch production company data for all movies when studio filters are enabled
+  async function fetchStudioDataForMovies() {
+    if (tmdbMovies.length === 0) return;
+
+    setFetchingStudioData(true);
+    const newDetails = new Map(tmdbMovieDetails);
+
+    for (const movie of tmdbMovies) {
+      // Skip if we already have the data
+      if (newDetails.has(movie.tmdb_id)) continue;
+
+      try {
+        const response = await fetch(`/api/tmdb/movie/${movie.tmdb_id}`);
+        const details = await response.json();
+        if (details.production_companies) {
+          newDetails.set(movie.tmdb_id, details.production_companies);
+        } else {
+          newDetails.set(movie.tmdb_id, []);
+        }
+      } catch (error) {
+        console.error(`Failed to fetch details for ${movie.title}:`, error);
+        newDetails.set(movie.tmdb_id, []);
+      }
+    }
+
+    setTmdbMovieDetails(newDetails);
+    setFetchingStudioData(false);
+  }
+
+  // Trigger studio data fetch when studio filters are enabled
+  useEffect(() => {
+    if ((oscarStudiosOnly || majorStudiosOnly) && tmdbMovies.length > 0) {
+      // Check if we need to fetch data for any movies
+      const needsFetch = tmdbMovies.some(m => !tmdbMovieDetails.has(m.tmdb_id));
+      if (needsFetch) {
+        fetchStudioDataForMovies();
+      }
+    }
+  }, [oscarStudiosOnly, majorStudiosOnly, tmdbMovies]);
+
+  // Calculate filtered movie count based on studio filters
+  function getFilteredMovieCount(): number {
+    const notImported = tmdbMovies.filter(m => !importedIds.has(m.tmdb_id));
+
+    // If no studio filters, return all not-imported movies
+    if (!oscarStudiosOnly && !majorStudiosOnly) {
+      return notImported.length;
+    }
+
+    // If we don't have studio data yet, show "..." in the count
+    const hasAllStudioData = notImported.every(m => tmdbMovieDetails.has(m.tmdb_id));
+    if (!hasAllStudioData) {
+      return -1; // Signal that we're still loading
+    }
+
+    // Filter based on studio data
+    return notImported.filter(m => {
+      const companies = tmdbMovieDetails.get(m.tmdb_id) || [];
+      if (majorStudiosOnly && !hasMajorStudio(companies)) return false;
+      if (oscarStudiosOnly && !hasOscarCaliberStudio(companies)) return false;
+      return true;
+    }).length;
   }
 
   async function importTMDBMovie(tmdbMovie: TMDBMovie, skipOscarCheck = false) {
@@ -322,17 +387,33 @@ export default function LeagueMoviesPage() {
   }
 
   async function importAllTMDBMovies() {
-    const moviesToImport = tmdbMovies.filter(m => !importedIds.has(m.tmdb_id));
+    let moviesToImport = tmdbMovies.filter(m => !importedIds.has(m.tmdb_id));
     if (moviesToImport.length === 0) {
       alert('All movies are already imported!');
       return;
     }
 
+    // Pre-filter using cached studio data if studio filters are enabled
+    if ((majorStudiosOnly || oscarStudiosOnly) && tmdbMovieDetails.size > 0) {
+      moviesToImport = moviesToImport.filter(m => {
+        const companies = tmdbMovieDetails.get(m.tmdb_id);
+        if (!companies) return true; // Include if we don't have data yet (will be checked during import)
+        if (majorStudiosOnly && !hasMajorStudio(companies)) return false;
+        if (oscarStudiosOnly && !hasOscarCaliberStudio(companies)) return false;
+        return true;
+      });
+
+      if (moviesToImport.length === 0) {
+        alert('No movies match the studio filter criteria.');
+        return;
+      }
+    }
+
     const filterNotes: string[] = [];
     if (majorStudiosOnly) filterNotes.push('Major studios only');
     if (oscarStudiosOnly) filterNotes.push('Oscar-caliber studios only');
-    const filterNote = filterNotes.length > 0 ? `\n\nNote: Filtering by ${filterNotes.join(', ')}` : '';
-    if (!confirm(`Import all ${moviesToImport.length} movies?${filterNote}`)) return;
+    const filterNote = filterNotes.length > 0 ? `\n\nFiltering by: ${filterNotes.join(', ')}` : '';
+    if (!confirm(`Import ${moviesToImport.length} movie${moviesToImport.length !== 1 ? 's' : ''}?${filterNote}`)) return;
 
     setBulkImporting(true);
     let successCount = 0;
@@ -802,7 +883,21 @@ export default function LeagueMoviesPage() {
             {tmdbMovies.length > 0 && !tmdbLoading && !tmdbError && (
               <div className={`mb-4 p-3 rounded-lg flex items-center justify-between ${majorStudiosOnly || oscarStudiosOnly ? 'bg-yellow-50' : 'bg-green-50'}`}>
                 <div className={`text-sm ${majorStudiosOnly || oscarStudiosOnly ? 'text-yellow-700' : 'text-green-700'}`}>
-                  <span className="font-semibold">{tmdbMovies.filter(m => !importedIds.has(m.tmdb_id)).length}</span> movies available to import
+                  {fetchingStudioData ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Checking studio data...
+                    </span>
+                  ) : (
+                    <>
+                      <span className="font-semibold">
+                        {(() => {
+                          const count = getFilteredMovieCount();
+                          return count === -1 ? '...' : count;
+                        })()}
+                      </span> movies available to import
+                    </>
+                  )}
                   {(majorStudiosOnly || oscarStudiosOnly || minVoteCount > 0 || minRuntime > 0 || excludeDocumentaries) && (
                     <div className="flex flex-wrap gap-2 mt-1">
                       {minVoteCount > 0 && (
@@ -835,13 +930,18 @@ export default function LeagueMoviesPage() {
                 </div>
                 <button
                   onClick={importAllTMDBMovies}
-                  disabled={bulkImporting}
+                  disabled={bulkImporting || fetchingStudioData}
                   className="btn-primary py-1.5 px-4 text-sm flex items-center gap-2"
                 >
                   {bulkImporting ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Importing...
+                    </>
+                  ) : fetchingStudioData ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading...
                     </>
                   ) : (
                     <>
