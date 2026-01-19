@@ -12,7 +12,7 @@ import { AuctionCountdown } from '@/components/auction/auction-countdown';
 import { formatCurrency, getMonthName, formatDate } from '@/lib/utils';
 import { formatScore } from '@/lib/scoring';
 import { cn } from '@/lib/utils';
-import type { Auction, Movie, Bid, Team } from '@/types';
+import type { Auction, Movie, Bid, Team, ReleaseType } from '@/types';
 import {
   ArrowLeft,
   Film,
@@ -21,6 +21,7 @@ import {
   DollarSign,
   Trophy,
   AlertTriangle,
+  Send,
 } from 'lucide-react';
 
 export default function AuctionDetailPage({
@@ -34,9 +35,11 @@ export default function AuctionDetailPage({
   const [auction, setAuction] = useState<Auction | null>(null);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [bids, setBids] = useState<Map<string, number>>(new Map());
+  const [savedBids, setSavedBids] = useState<Map<string, number>>(new Map());
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<Set<string>>(new Set());
+  const [submitting, setSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
   const [results, setResults] = useState<any[] | null>(null);
 
   // Load auction data
@@ -92,7 +95,8 @@ export default function AuctionDetailPage({
       existingBids?.forEach((bid) => {
         bidMap.set(bid.movie_id, bid.amount);
       });
-      setBids(bidMap);
+      setBids(new Map(bidMap));
+      setSavedBids(new Map(bidMap));
 
       // If resolved, get results
       if (auctionData.status === 'resolved') {
@@ -141,41 +145,80 @@ export default function AuctionDetailPage({
     loadData();
   }, [auctionId, supabase, router]);
 
-  // Save bid
-  const saveBid = useCallback(async (movieId: string, amount: number) => {
+  // Handle bid change (local only - not saved until submit)
+  const handleBidChange = (movieId: string, amount: number) => {
+    setBids((prev) => {
+      const next = new Map(prev);
+      if (amount > 0) {
+        next.set(movieId, amount);
+      } else {
+        next.delete(movieId);
+      }
+      return next;
+    });
+    setSubmitSuccess(false);
+  };
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = useCallback(() => {
+    if (bids.size !== savedBids.size) return true;
+    const bidEntries = Array.from(bids.entries());
+    for (const [movieId, amount] of bidEntries) {
+      if (savedBids.get(movieId) !== amount) return true;
+    }
+    const savedKeys = Array.from(savedBids.keys());
+    for (const movieId of savedKeys) {
+      if (!bids.has(movieId)) return true;
+    }
+    return false;
+  }, [bids, savedBids]);
+
+  // Submit all bids
+  const submitBids = async () => {
     if (!team || !auctionId) return;
 
-    setSaving((prev) => new Set(prev).add(movieId));
+    setSubmitting(true);
+    setSubmitSuccess(false);
 
-    await supabase
-      .from('bids')
-      .upsert({
+    // Build upsert array for all bids
+    const bidUpserts = Array.from(bids.entries())
+      .filter(([_, amount]) => amount > 0)
+      .map(([movieId, amount]) => ({
         auction_id: auctionId,
         team_id: team.id,
         movie_id: movieId,
         amount,
         updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'auction_id,team_id,movie_id',
-      });
+      }));
 
-    setTimeout(() => {
-      setSaving((prev) => {
-        const next = new Set(prev);
-        next.delete(movieId);
-        return next;
-      });
-    }, 500);
-  }, [team, auctionId, supabase]);
+    // Delete bids that were removed (in savedBids but not in current bids or amount is 0)
+    const deletedMovieIds = Array.from(savedBids.keys()).filter(
+      movieId => !bids.has(movieId) || bids.get(movieId) === 0
+    );
 
-  // Handle bid change
-  const handleBidChange = (movieId: string, amount: number) => {
-    setBids((prev) => {
-      const next = new Map(prev);
-      next.set(movieId, amount);
-      return next;
-    });
-    saveBid(movieId, amount);
+    if (deletedMovieIds.length > 0) {
+      await supabase
+        .from('bids')
+        .delete()
+        .eq('auction_id', auctionId)
+        .eq('team_id', team.id)
+        .in('movie_id', deletedMovieIds);
+    }
+
+    // Upsert new/updated bids
+    if (bidUpserts.length > 0) {
+      await supabase
+        .from('bids')
+        .upsert(bidUpserts, {
+          onConflict: 'auction_id,team_id,movie_id',
+        });
+    }
+
+    // Update saved state
+    setSavedBids(new Map(bids));
+    setSubmitting(false);
+    setSubmitSuccess(true);
+    setTimeout(() => setSubmitSuccess(false), 3000);
   };
 
   if (loading || !auction) {
@@ -251,6 +294,7 @@ export default function AuctionDetailPage({
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
                     <th className="text-left p-4 font-semibold text-gray-900">Movie</th>
+                    <th className="text-left p-4 font-semibold text-gray-900 hidden sm:table-cell">Type</th>
                     <th className="text-left p-4 font-semibold text-gray-900">Winner</th>
                     <th className="text-right p-4 font-semibold text-gray-900">Winning Bid</th>
                     <th className="text-right p-4 font-semibold text-gray-900">Your Bid</th>
@@ -258,7 +302,9 @@ export default function AuctionDetailPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {results.map((result) => (
+                  {results.map((result) => {
+                    const releaseType = result.movie.release_type as ReleaseType;
+                    return (
                     <tr key={result.movie.id} className="border-b border-gray-100">
                       <td className="p-4">
                         <div className="flex items-center gap-3">
@@ -280,6 +326,19 @@ export default function AuctionDetailPage({
                             {result.movie.title}
                           </Link>
                         </div>
+                      </td>
+                      <td className="p-4 hidden sm:table-cell">
+                        <Badge
+                          variant={
+                            releaseType === 'wide' ? 'green' :
+                            releaseType === 'limited' ? 'purple' :
+                            releaseType === 'streaming' ? 'default' : 'gray'
+                          }
+                        >
+                          {releaseType === 'wide' ? 'Wide' :
+                           releaseType === 'limited' ? 'Limited' :
+                           releaseType === 'streaming' ? 'Streaming' : '?'}
+                        </Badge>
                       </td>
                       <td className="p-4">
                         {result.winner ? (
@@ -314,7 +373,7 @@ export default function AuctionDetailPage({
                         )}
                       </td>
                     </tr>
-                  ))}
+                  );})}
                 </tbody>
               </table>
             </div>
@@ -355,11 +414,53 @@ export default function AuctionDetailPage({
                 key={movie.id}
                 movie={movie}
                 bidAmount={bids.get(movie.id) || 0}
+                savedAmount={savedBids.get(movie.id) || 0}
                 maxBid={team?.budget_remaining || 0}
                 onBidChange={handleBidChange}
-                saving={saving.has(movie.id)}
               />
             ))}
+
+            {/* Submit Button */}
+            <div className="sticky bottom-4 bg-white/95 backdrop-blur border border-gray-200 rounded-xl p-4 shadow-lg">
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-sm">
+                  {hasUnsavedChanges() ? (
+                    <span className="text-amber-600 flex items-center gap-1.5">
+                      <AlertTriangle className="h-4 w-4" />
+                      You have unsaved changes
+                    </span>
+                  ) : submitSuccess ? (
+                    <span className="text-green-600 flex items-center gap-1.5">
+                      <Check className="h-4 w-4" />
+                      Bids submitted successfully!
+                    </span>
+                  ) : (
+                    <span className="text-gray-500">
+                      {bids.size} movie{bids.size !== 1 ? 's' : ''} • {formatCurrency(totalBids)} total
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={submitBids}
+                  disabled={submitting || isOverBudget || !hasUnsavedChanges()}
+                  className={cn(
+                    "flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-colors",
+                    isOverBudget
+                      ? "bg-red-100 text-red-700 cursor-not-allowed"
+                      : hasUnsavedChanges()
+                        ? "bg-purple-600 text-white hover:bg-purple-700"
+                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  )}
+                >
+                  {submitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  {submitting ? 'Submitting...' : isOverBudget ? 'Over Budget!' : 'Submit Bids'}
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Sidebar */}
@@ -405,17 +506,22 @@ export default function AuctionDetailPage({
 function BidRow({
   movie,
   bidAmount,
+  savedAmount,
   maxBid,
   onBidChange,
-  saving,
 }: {
   movie: Movie;
   bidAmount: number;
+  savedAmount: number;
   maxBid: number;
   onBidChange: (movieId: string, amount: number) => void;
-  saving: boolean;
 }) {
   const [value, setValue] = useState(bidAmount > 0 ? bidAmount.toString() : '');
+
+  // Sync value when bidAmount changes from parent (e.g., on load)
+  useEffect(() => {
+    setValue(bidAmount > 0 ? bidAmount.toString() : '');
+  }, [bidAmount]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
@@ -427,10 +533,16 @@ function BidRow({
     }
   };
 
+  const isUnsaved = bidAmount !== savedAmount;
+  const releaseType = movie.release_type as ReleaseType;
+
   return (
-    <div className="flex items-center gap-4 bg-white rounded-lg border border-gray-200 p-4">
+    <div className={cn(
+      "flex items-center gap-3 sm:gap-4 bg-white rounded-lg border p-3 sm:p-4 transition-colors",
+      isUnsaved ? "border-amber-300 bg-amber-50/50" : "border-gray-200"
+    )}>
       {/* Movie Info */}
-      <div className="w-12 h-18 bg-gray-200 rounded flex-shrink-0 overflow-hidden">
+      <div className="w-10 h-15 sm:w-12 sm:h-18 bg-gray-200 rounded flex-shrink-0 overflow-hidden">
         {movie.poster_url ? (
           <img
             src={movie.poster_url}
@@ -439,7 +551,7 @@ function BidRow({
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Film className="h-6 w-6 text-gray-400" />
+            <Film className="h-5 w-5 sm:h-6 sm:w-6 text-gray-400" />
           </div>
         )}
       </div>
@@ -447,34 +559,54 @@ function BidRow({
       <div className="flex-1 min-w-0">
         <Link
           href={`/movies/${movie.id}`}
-          className="font-medium text-gray-900 truncate hover:text-purple-600"
+          className="font-medium text-gray-900 truncate block hover:text-purple-600 text-sm sm:text-base"
         >
           {movie.title}
         </Link>
-        <p className="text-sm text-gray-500">
-          {movie.genre || 'Unknown'} • Score: {formatScore(movie.calculated_score)}
-        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge
+            variant={
+              releaseType === 'wide' ? 'green' :
+              releaseType === 'limited' ? 'purple' :
+              releaseType === 'streaming' ? 'default' : 'gray'
+            }
+          >
+            {releaseType === 'wide' ? 'Wide' :
+             releaseType === 'limited' ? 'Limited' :
+             releaseType === 'streaming' ? 'Streaming' : '?'}
+          </Badge>
+          <span className="text-xs sm:text-sm text-gray-500">
+            Score: {formatScore(movie.calculated_score)}
+          </span>
+        </div>
       </div>
 
       {/* Bid Input */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2">
         <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+          <span className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">$</span>
           <input
             type="number"
             min="0"
             step="0.01"
             value={value}
             onChange={handleChange}
-            placeholder="0.00"
-            className="w-24 pl-7 pr-3 py-2 border border-gray-300 rounded-lg text-right focus:outline-none focus:ring-2 focus:ring-purple-500"
+            placeholder="0"
+            className={cn(
+              "w-20 sm:w-24 pl-5 sm:pl-7 pr-2 sm:pr-3 py-2 border rounded-lg text-right focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm sm:text-base",
+              isUnsaved ? "border-amber-400" : "border-gray-300"
+            )}
           />
         </div>
 
         {/* Status Indicator */}
-        <div className="w-6">
-          {saving && <Loader2 className="h-4 w-4 text-gray-400 animate-spin" />}
-          {!saving && bidAmount > 0 && <Check className="h-4 w-4 text-green-500" />}
+        <div className="w-5 sm:w-6 flex-shrink-0" title={isUnsaved ? "Unsaved" : savedAmount > 0 ? "Saved" : ""}>
+          {isUnsaved && (
+            <div className="w-2 h-2 rounded-full bg-amber-400" />
+          )}
+          {!isUnsaved && savedAmount > 0 && (
+            <Check className="h-4 w-4 text-green-500" />
+          )}
         </div>
       </div>
     </div>
