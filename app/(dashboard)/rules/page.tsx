@@ -37,7 +37,7 @@ export default function RulesPage() {
         .single();
 
       if (team?.league) {
-        const league = team.league as { season_end_month: number; season_end_year: number };
+        const league = team.league as unknown as { season_end_month: number; season_end_year: number };
         setSeasonEndMonth(league.season_end_month);
         setSeasonEndYear(league.season_end_year);
       }
