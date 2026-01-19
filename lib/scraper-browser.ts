@@ -10,6 +10,7 @@ export interface BrowserScrapeResult {
   opening_weekend: number | null;
   opening_theaters: number | null;
   widest_release: number | null;
+  release_scale: 'wide' | 'limited' | null;
 }
 
 /**
@@ -38,6 +39,67 @@ function normalizeTitle(title: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '')
     .trim();
+}
+
+/**
+ * Scrape BOM Release Schedule page to get actual release scale (Wide/Limited)
+ * URL: https://www.boxofficemojo.com/release-schedule/?year=2026&month=01
+ */
+async function scrapeBOMReleaseSchedule(title: string, year: number, month: number): Promise<'wide' | 'limited' | null> {
+  const normalizedTitle = normalizeTitle(title);
+  const monthStr = String(month).padStart(2, '0');
+  const url = `https://www.boxofficemojo.com/release-schedule/?year=${year}&month=${monthStr}`;
+
+  console.log(`Fetching BOM release schedule: ${url}`);
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+
+    if (!response.ok) {
+      console.log(`BOM release schedule returned ${response.status}`);
+      return null;
+    }
+
+    const html = await response.text();
+    console.log(`BOM release schedule HTML length: ${html.length}`);
+
+    // The release schedule page has rows with movie titles and "Wide" or "Limited" labels
+    // Split into table rows
+    const rows = html.split(/<tr[^>]*>/i);
+
+    for (const row of rows) {
+      // Check if this row contains our movie title
+      const titleMatch = row.match(/<a[^>]*href="\/release\/[^"]*"[^>]*>([^<]+)<\/a>/i);
+      if (!titleMatch) continue;
+
+      const rowTitle = normalizeTitle(titleMatch[1]);
+
+      // Check if titles match (allow partial match for longer titles)
+      if (rowTitle.includes(normalizedTitle) || normalizedTitle.includes(rowTitle)) {
+        console.log(`Found movie in release schedule: "${titleMatch[1]}" (looking for "${title}")`);
+
+        // Look for "Wide" or "Limited" in the same row
+        if (/>\s*Wide\s*</i.test(row)) {
+          console.log(`Release scale from BOM schedule: Wide`);
+          return 'wide';
+        } else if (/>\s*Limited\s*</i.test(row)) {
+          console.log(`Release scale from BOM schedule: Limited`);
+          return 'limited';
+        }
+      }
+    }
+
+    console.log(`Movie "${title}" not found in release schedule for ${year}-${monthStr}`);
+    return null;
+  } catch (error) {
+    console.error(`Error scraping BOM release schedule:`, error);
+    return null;
+  }
 }
 
 /**
@@ -246,6 +308,7 @@ async function scrapeBOMEnhanced(imdbId: string): Promise<BrowserScrapeResult | 
       opening_weekend: null,
       opening_theaters: null,
       widest_release: null,
+      release_scale: null,
     };
 
     // Extract domestic box office - this IS in static HTML
@@ -296,9 +359,10 @@ export async function scrapeBoxOfficeMojoBrowser(
   imdbId: string,
   title?: string,
   year?: number,
-  releaseDate?: string
+  releaseDate?: string,
+  month?: number
 ): Promise<BrowserScrapeResult | null> {
-  console.log(`Starting enhanced scrape for ${imdbId} (${title} ${year}, release: ${releaseDate})`);
+  console.log(`Starting enhanced scrape for ${imdbId} (${title} ${year}, month: ${month}, release: ${releaseDate})`);
 
   const result: BrowserScrapeResult = {
     domestic_box_office: 0,
@@ -306,7 +370,18 @@ export async function scrapeBoxOfficeMojoBrowser(
     opening_weekend: null,
     opening_theaters: null,
     widest_release: null,
+    release_scale: null,
   };
+
+  // 0. Get release scale from BOM release schedule (most authoritative source)
+  if (title && year && month) {
+    console.log('Trying BOM release schedule for release scale...');
+    const releaseScale = await scrapeBOMReleaseSchedule(title, year, month);
+    if (releaseScale) {
+      result.release_scale = releaseScale;
+      console.log(`Got release scale from BOM schedule: ${releaseScale}`);
+    }
+  }
 
   // 1. Get box office data from the movie's title page (this works with static HTML)
   const bomResult = await scrapeBOMEnhanced(imdbId);

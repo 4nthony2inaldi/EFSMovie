@@ -40,7 +40,7 @@ function determineReleaseType(
 
 export async function POST(request: NextRequest) {
   try {
-    const { movieId, tmdbId, imdbId: providedImdbId, title, releaseYear, releaseDate: providedReleaseDate } = await request.json();
+    const { movieId, tmdbId, imdbId: providedImdbId, title, releaseYear, releaseMonth, releaseDate: providedReleaseDate } = await request.json();
 
     if (!movieId) {
       return NextResponse.json({ error: 'Movie ID is required' }, { status: 400 });
@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
 
     let imdbId = providedImdbId;
     let releaseDate = providedReleaseDate;
+    let month = releaseMonth;
 
     // Always try to get fresh IMDB ID and release date from TMDB
     if (tmdbId) {
@@ -87,6 +88,15 @@ export async function POST(request: NextRequest) {
       console.log(`Using constructed release date: ${releaseDate}`);
     }
 
+    // Extract month from release date if not provided
+    if (!month && releaseDate) {
+      const dateParts = releaseDate.split('-');
+      if (dateParts.length >= 2) {
+        month = parseInt(dateParts[1], 10);
+        console.log(`Extracted month from release date: ${month}`);
+      }
+    }
+
     // Update the IMDB ID in database if we got a fresh one
     if (imdbId !== providedImdbId) {
       const supabaseForUpdate = getSupabaseAdmin();
@@ -97,10 +107,10 @@ export async function POST(request: NextRequest) {
       console.log(`Updated IMDB ID in database: ${imdbId}`);
     }
 
-    console.log(`Starting enhanced scrape for ${imdbId} (${title} ${releaseYear}, release: ${releaseDate})...`);
+    console.log(`Starting enhanced scrape for ${imdbId} (${title} ${releaseYear}, month: ${month}, release: ${releaseDate})...`);
 
-    // Use multi-source scraper with title/year for theater counts
-    const data = await scrapeBoxOfficeMojoBrowser(imdbId, title, releaseYear, releaseDate);
+    // Use multi-source scraper with title/year/month for release scale from BOM schedule
+    const data = await scrapeBoxOfficeMojoBrowser(imdbId, title, releaseYear, releaseDate, month);
 
     // Also scrape Metacritic score
     const metacriticScore = title ? await scrapeMetacriticScore(title, releaseYear) : null;
@@ -125,12 +135,21 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Determine release type from theater data
-    const releaseType = determineReleaseType(
-      data?.theater_count,
-      data?.widest_release,
-      !!data
-    );
+    // Determine release type - prefer BOM schedule data, fall back to theater count calculation
+    let releaseType: ReleaseType;
+    if (data?.release_scale) {
+      // Use authoritative release scale from BOM release schedule
+      releaseType = data.release_scale;
+      console.log(`Using release type from BOM schedule: ${releaseType}`);
+    } else {
+      // Fall back to calculation from theater counts
+      releaseType = determineReleaseType(
+        data?.theater_count,
+        data?.widest_release,
+        !!data
+      );
+      console.log(`Calculated release type from theaters: ${releaseType}`);
+    }
 
     // Build update object
     const updateData: Record<string, unknown> = {
@@ -204,10 +223,10 @@ export async function PUT(request: NextRequest) {
 
     const supabase = getSupabaseAdmin();
 
-    // Get movie details
+    // Get movie details including release_month
     const { data: movies, error } = await supabase
       .from('movies')
-      .select('id, title, tmdb_id, release_year, imdb_id')
+      .select('id, title, tmdb_id, release_year, release_month, imdb_id')
       .in('id', movieIds);
 
     if (error) {
@@ -242,18 +261,29 @@ export async function PUT(request: NextRequest) {
           continue;
         }
 
-        // Scrape box office and theater data using yearly chart
-        const boxOfficeData = await scrapeBoxOfficeMojoBrowser(imdbId, movie.title, movie.release_year);
+        // Scrape box office and theater data, including release scale from BOM schedule
+        const boxOfficeData = await scrapeBoxOfficeMojoBrowser(
+          imdbId,
+          movie.title,
+          movie.release_year,
+          undefined,
+          movie.release_month
+        );
 
         // Scrape Metacritic score
         const metacriticScore = await scrapeMetacriticScore(movie.title, movie.release_year);
 
-        // Determine release type from theater data
-        const releaseType = determineReleaseType(
-          boxOfficeData?.theater_count,
-          boxOfficeData?.widest_release,
-          !!boxOfficeData
-        );
+        // Determine release type - prefer BOM schedule data, fall back to theater count calculation
+        let releaseType: ReleaseType;
+        if (boxOfficeData?.release_scale) {
+          releaseType = boxOfficeData.release_scale;
+        } else {
+          releaseType = determineReleaseType(
+            boxOfficeData?.theater_count,
+            boxOfficeData?.widest_release,
+            !!boxOfficeData
+          );
+        }
 
         // Build update object with only non-null values
         const updateData: Record<string, unknown> = {

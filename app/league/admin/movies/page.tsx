@@ -353,6 +353,7 @@ export default function LeagueMoviesPage() {
           imdbId: movie.imdb_id,
           title: movie.title,
           releaseYear: movie.release_year,
+          releaseMonth: movie.release_month,
           releaseDate,
         }),
       });
@@ -415,6 +416,7 @@ export default function LeagueMoviesPage() {
             imdbId: movie.imdb_id,
             title: movie.title,
             releaseYear: movie.release_year,
+            releaseMonth: movie.release_month,
             releaseDate,
           }),
         });
