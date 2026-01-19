@@ -186,9 +186,11 @@ export async function scrapeMetacriticScore(imdbId: string, title: string, year?
 
     const html = await response.text();
 
-    // Look for Metascore on IMDB page - it's usually in a span with score-meta class
-    // or in structured data
+    // Look for Metascore on IMDB page - check JSON data and HTML
     const scorePatterns = [
+      // IMDB JSON format: "metacritic":{"metascore":{"score":81
+      /"metacritic":\s*\{\s*"metascore":\s*\{\s*"score":\s*(\d+)/i,
+      // Older formats
       /metacriticScore[^}]*"ratingValue"\s*:\s*"?(\d+)"?/i,
       /Metascore[^0-9]*(\d+)/i,
       /"aggregateRating"[^}]*"ratingValue"\s*:\s*"?(\d+)"?[^}]*"Metacritic"/i,
