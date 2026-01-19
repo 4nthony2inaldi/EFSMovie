@@ -63,9 +63,10 @@ export default async function SchedulePage({
 
   // Then apply tab-specific filters and ordering
   if (tab === 'upcoming') {
-    // Movies releasing in next 3 months
+    // Movies from current month onward (show all of current month, not just future dates)
+    // This ensures movies released earlier in the current month still appear
     query = query
-      .gte('release_date', today.toISOString().split('T')[0])
+      .or(`release_year.gt.${currentYear},and(release_year.eq.${currentYear},release_month.gte.${currentMonth})`)
       .order('release_date', { ascending: true })
       .limit(50);
   } else if (tab === 'theaters') {
