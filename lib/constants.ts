@@ -149,6 +149,65 @@ export function hasOscarCaliberStudio(productionCompanies: string[] | null | und
   );
 }
 
+// Major Studios - Tighter filter for major theatrical distributors only
+// These are the studios most likely to have wide theatrical releases
+export const MAJOR_STUDIOS = [
+  // Big Six / Major Studios
+  'Universal Pictures',
+  'Warner Bros. Pictures',
+  'Warner Bros.',
+  'Paramount Pictures',
+  'Walt Disney Pictures',
+  'Walt Disney Studios',
+  'Disney',
+  'Sony Pictures',
+  'Columbia Pictures',
+  '20th Century Studios',
+  '20th Century Fox',
+  'Lionsgate',
+  'Lionsgate Films',
+  'Metro-Goldwyn-Mayer',
+  'MGM',
+
+  // Major Specialty/Indie
+  'A24',
+  'Searchlight Pictures',
+  'Fox Searchlight Pictures',
+  'Focus Features',
+  'Neon',
+
+  // Streaming Giants
+  'Netflix',
+  'Amazon Studios',
+  'Amazon MGM Studios',
+  'Apple Studios',
+  'Apple Original Films',
+
+  // Other Major Players
+  'New Line Cinema',
+  'DreamWorks Pictures',
+  'DreamWorks',
+  'DreamWorks Animation',
+  'Pixar',
+  'Marvel Studios',
+  'Lucasfilm',
+  'Amblin Entertainment',
+  'Legendary Pictures',
+  'Legendary Entertainment',
+  'Blumhouse Productions',
+] as const;
+
+// Helper to check if a movie has major studio backing
+export function hasMajorStudio(productionCompanies: string[] | null | undefined): boolean {
+  if (!productionCompanies || productionCompanies.length === 0) return false;
+  return productionCompanies.some(company =>
+    MAJOR_STUDIOS.some(studio =>
+      company.toLowerCase().includes(studio.toLowerCase()) ||
+      studio.toLowerCase().includes(company.toLowerCase())
+    )
+  );
+}
+
 // Colors (for reference in components)
 export const COLORS = {
   purple: {

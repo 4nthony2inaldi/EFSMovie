@@ -43,6 +43,13 @@ export interface TMDBResponse<T> {
   total_results: number;
 }
 
+// Filter options for TMDB discover queries
+export interface TMDBFilterOptions {
+  minVoteCount?: number;
+  excludeDocumentaries?: boolean;
+  minRuntime?: number;
+}
+
 // Genre ID to name mapping
 const GENRES: Record<number, string> = {
   28: 'Action',
@@ -119,14 +126,14 @@ class TMDBClient {
     startDate: string,
     endDate: string,
     page = 1,
-    options: { restrictReleaseType?: boolean } = {}
+    options: TMDBFilterOptions & { restrictReleaseType?: boolean } = {}
   ): Promise<TMDBResponse<TMDBMovie>> {
     const params: Record<string, string> = {
       page: page.toString(),
       'primary_release_date.gte': startDate,
       'primary_release_date.lte': endDate,
       sort_by: 'popularity.desc',
-      'vote_count.gte': '0',
+      'vote_count.gte': (options.minVoteCount ?? 0).toString(),
       with_original_language: 'en',
     };
 
@@ -136,11 +143,21 @@ class TMDBClient {
       params.region = 'US';
     }
 
+    // Exclude Documentary (99) and TV Movie (10770) genres
+    if (options.excludeDocumentaries) {
+      params.without_genres = '99,10770';
+    }
+
+    // Minimum runtime filter
+    if (options.minRuntime && options.minRuntime > 0) {
+      params['with_runtime.gte'] = options.minRuntime.toString();
+    }
+
     return this.fetch<TMDBResponse<TMDBMovie>>('/discover/movie', params);
   }
 
   // Get movies releasing in a specific month
-  async getMoviesByMonth(year: number, month: number): Promise<TMDBMovie[]> {
+  async getMoviesByMonth(year: number, month: number, filterOptions: TMDBFilterOptions = {}): Promise<TMDBMovie[]> {
     const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
     const lastDay = new Date(year, month, 0).getDate();
     const endDate = `${year}-${month.toString().padStart(2, '0')}-${lastDay}`;
@@ -158,6 +175,7 @@ class TMDBClient {
     while (page <= totalPages) {
       const response = await this.discoverByReleaseDates(startDate, endDate, page, {
         restrictReleaseType: isPast,
+        ...filterOptions,
       });
       allMovies.push(...response.results);
       totalPages = response.total_pages;

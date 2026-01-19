@@ -17,6 +17,11 @@ export async function GET(request: NextRequest) {
   const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString());
   const month = parseInt(searchParams.get('month') || (new Date().getMonth() + 1).toString());
 
+  // Parse filter options
+  const minVoteCount = searchParams.get('minVoteCount') ? parseInt(searchParams.get('minVoteCount')!) : undefined;
+  const excludeDocumentaries = searchParams.get('excludeDocumentaries') === 'true';
+  const minRuntime = searchParams.get('minRuntime') ? parseInt(searchParams.get('minRuntime')!) : undefined;
+
   // Get API key at runtime
   const apiKey = getApiKey();
 
@@ -48,7 +53,11 @@ export async function GET(request: NextRequest) {
   try {
     // Create client with API key at request time
     const tmdb = new TMDBClient(apiKey);
-    const movies = await tmdb.getMoviesByMonth(year, month);
+    const movies = await tmdb.getMoviesByMonth(year, month, {
+      minVoteCount,
+      excludeDocumentaries,
+      minRuntime,
+    });
 
     // Transform to a simpler format
     const transformed = movies.map((movie) => ({

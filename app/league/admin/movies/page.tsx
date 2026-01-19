@@ -5,8 +5,8 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
-import { hasOscarCaliberStudio } from '@/lib/constants';
-import { Film, Loader2, Plus, Pencil, Trash2, Search, Download, Globe, Check, X, RefreshCw, DollarSign, Award } from 'lucide-react';
+import { hasOscarCaliberStudio, hasMajorStudio } from '@/lib/constants';
+import { Film, Loader2, Plus, Pencil, Trash2, Search, Download, Globe, Check, X, RefreshCw, DollarSign, Award, Filter, Clock, ThumbsUp, Building2 } from 'lucide-react';
 
 type ReleaseType = 'wide' | 'limited' | 'streaming' | 'unknown';
 
@@ -76,6 +76,10 @@ export default function LeagueMoviesPage() {
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
   const [bulkRefreshing, setBulkRefreshing] = useState(false);
   const [oscarStudiosOnly, setOscarStudiosOnly] = useState(false);
+  const [majorStudiosOnly, setMajorStudiosOnly] = useState(false);
+  const [minVoteCount, setMinVoteCount] = useState(0);
+  const [excludeDocumentaries, setExcludeDocumentaries] = useState(false);
+  const [minRuntime, setMinRuntime] = useState(0);
   const [tmdbMovieDetails, setTmdbMovieDetails] = useState<Map<number, string[]>>(new Map());
 
   const [formData, setFormData] = useState({
@@ -117,9 +121,25 @@ export default function LeagueMoviesPage() {
     setTmdbLoading(true);
     setTmdbError(null);
     try {
-      // Add cache-busting timestamp to bypass Vercel edge cache
-      const cacheBuster = Date.now();
-      const response = await fetch(`/api/tmdb/upcoming?year=${tmdbYear}&month=${tmdbMonth}&_t=${cacheBuster}`, {
+      // Build query params with filters
+      const params = new URLSearchParams({
+        year: tmdbYear.toString(),
+        month: tmdbMonth.toString(),
+        _t: Date.now().toString(), // Cache-busting timestamp
+      });
+
+      // Add optional filters
+      if (minVoteCount > 0) {
+        params.set('minVoteCount', minVoteCount.toString());
+      }
+      if (excludeDocumentaries) {
+        params.set('excludeDocumentaries', 'true');
+      }
+      if (minRuntime > 0) {
+        params.set('minRuntime', minRuntime.toString());
+      }
+
+      const response = await fetch(`/api/tmdb/upcoming?${params}`, {
         cache: 'no-store',
       });
       const data = await response.json();
@@ -160,7 +180,15 @@ export default function LeagueMoviesPage() {
         });
       }
 
-      // Check Oscar filter if enabled
+      // Check studio filters if enabled
+      if (majorStudiosOnly && !skipOscarCheck && !hasMajorStudio(details.production_companies)) {
+        setImportingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(tmdbMovie.tmdb_id);
+          return next;
+        });
+        return { skipped: true, reason: 'no-major-studio' };
+      }
       if (oscarStudiosOnly && !skipOscarCheck && !hasOscarCaliberStudio(details.production_companies)) {
         setImportingIds((prev) => {
           const next = new Set(prev);
@@ -300,7 +328,10 @@ export default function LeagueMoviesPage() {
       return;
     }
 
-    const filterNote = oscarStudiosOnly ? '\n\nNote: Only movies from Oscar-caliber studios will be imported.' : '';
+    const filterNotes: string[] = [];
+    if (majorStudiosOnly) filterNotes.push('Major studios only');
+    if (oscarStudiosOnly) filterNotes.push('Oscar-caliber studios only');
+    const filterNote = filterNotes.length > 0 ? `\n\nNote: Filtering by ${filterNotes.join(', ')}` : '';
     if (!confirm(`Import all ${moviesToImport.length} movies?${filterNote}`)) return;
 
     setBulkImporting(true);
@@ -331,7 +362,16 @@ export default function LeagueMoviesPage() {
           });
         }
 
-        // Check Oscar filter if enabled
+        // Check studio filters if enabled
+        if (majorStudiosOnly && !hasMajorStudio(details.production_companies)) {
+          skippedCount++;
+          setImportingIds((prev) => {
+            const next = new Set(prev);
+            next.delete(tmdbMovie.tmdb_id);
+            return next;
+          });
+          continue;
+        }
         if (oscarStudiosOnly && !hasOscarCaliberStudio(details.production_companies)) {
           skippedCount++;
           setImportingIds((prev) => {
@@ -385,7 +425,8 @@ export default function LeagueMoviesPage() {
 
     let message = `Import completed: ${successCount} imported`;
     if (skippedCount > 0) {
-      message += `, ${skippedCount} skipped (no Oscar-caliber studio)`;
+      const skipReason = majorStudiosOnly ? 'no major studio' : 'no Oscar-caliber studio';
+      message += `, ${skippedCount} skipped (${skipReason})`;
     }
     if (failCount > 0) {
       message += `, ${failCount} failed.\nLast error: ${lastError}\n\nIf all failed, you may need to add an INSERT policy in Supabase.`;
@@ -622,6 +663,7 @@ export default function LeagueMoviesPage() {
             </div>
           </CardHeader>
           <CardContent>
+            {/* Date Selection Row */}
             <div className="flex flex-wrap gap-4 mb-4">
               <select
                 value={tmdbMonth}
@@ -649,29 +691,147 @@ export default function LeagueMoviesPage() {
                 {tmdbLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                 Load Movies
               </button>
-              <label className="flex items-center gap-2 cursor-pointer ml-auto">
-                <input
-                  type="checkbox"
-                  checked={oscarStudiosOnly}
-                  onChange={(e) => setOscarStudiosOnly(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                />
-                <span className="flex items-center gap-1 text-sm font-medium text-gray-700">
-                  <Award className="h-4 w-4 text-yellow-500" />
-                  Oscar Studios Only
-                </span>
-              </label>
+            </div>
+
+            {/* TMDB API Filters */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Filter className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-semibold text-blue-800">TMDB API Filters</span>
+                <span className="text-xs text-blue-600">(applied before fetching)</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Min Vote Count */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+                    <ThumbsUp className="h-4 w-4 text-blue-500" />
+                    Min Vote Count
+                  </label>
+                  <input
+                    type="number"
+                    value={minVoteCount}
+                    onChange={(e) => setMinVoteCount(parseInt(e.target.value) || 0)}
+                    className="input w-full"
+                    min={0}
+                    max={1000}
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Higher = more known movies</p>
+                </div>
+
+                {/* Min Runtime */}
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
+                    <Clock className="h-4 w-4 text-blue-500" />
+                    Min Runtime (min)
+                  </label>
+                  <input
+                    type="number"
+                    value={minRuntime}
+                    onChange={(e) => setMinRuntime(parseInt(e.target.value) || 0)}
+                    className="input w-full"
+                    min={0}
+                    max={300}
+                    placeholder="0"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">75+ excludes shorts</p>
+                </div>
+
+                {/* Exclude Documentaries */}
+                <div className="flex items-center">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={excludeDocumentaries}
+                      onChange={(e) => setExcludeDocumentaries(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Exclude Documentaries & TV Movies
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Import Filters (applied during import) */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Building2 className="h-4 w-4 text-yellow-600" />
+                <span className="text-sm font-semibold text-yellow-800">Studio Filters</span>
+                <span className="text-xs text-yellow-600">(applied during import)</span>
+              </div>
+              <div className="flex flex-wrap gap-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={majorStudiosOnly}
+                    onChange={(e) => {
+                      setMajorStudiosOnly(e.target.checked);
+                      if (e.target.checked) setOscarStudiosOnly(false);
+                    }}
+                    className="w-4 h-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
+                  />
+                  <span className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                    <Building2 className="h-4 w-4 text-yellow-600" />
+                    Major Studios Only
+                    <span className="text-xs text-gray-500">(~40 studios)</span>
+                  </span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={oscarStudiosOnly}
+                    onChange={(e) => {
+                      setOscarStudiosOnly(e.target.checked);
+                      if (e.target.checked) setMajorStudiosOnly(false);
+                    }}
+                    className="w-4 h-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
+                  />
+                  <span className="flex items-center gap-1 text-sm font-medium text-gray-700">
+                    <Award className="h-4 w-4 text-yellow-500" />
+                    Oscar-Caliber Studios
+                    <span className="text-xs text-gray-500">(~140 studios)</span>
+                  </span>
+                </label>
+              </div>
             </div>
 
             {/* Import All Button */}
             {tmdbMovies.length > 0 && !tmdbLoading && !tmdbError && (
-              <div className={`mb-4 p-3 rounded-lg flex items-center justify-between ${oscarStudiosOnly ? 'bg-yellow-50' : 'bg-blue-50'}`}>
-                <span className={`text-sm ${oscarStudiosOnly ? 'text-yellow-700' : 'text-blue-700'}`}>
-                  {tmdbMovies.filter(m => !importedIds.has(m.tmdb_id)).length} movies available to import
-                  {oscarStudiosOnly && (
-                    <span className="ml-1 font-medium">(filtering by Oscar-caliber studios)</span>
+              <div className={`mb-4 p-3 rounded-lg flex items-center justify-between ${majorStudiosOnly || oscarStudiosOnly ? 'bg-yellow-50' : 'bg-green-50'}`}>
+                <div className={`text-sm ${majorStudiosOnly || oscarStudiosOnly ? 'text-yellow-700' : 'text-green-700'}`}>
+                  <span className="font-semibold">{tmdbMovies.filter(m => !importedIds.has(m.tmdb_id)).length}</span> movies available to import
+                  {(majorStudiosOnly || oscarStudiosOnly || minVoteCount > 0 || minRuntime > 0 || excludeDocumentaries) && (
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {minVoteCount > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs">
+                          <ThumbsUp className="h-3 w-3" /> {minVoteCount}+ votes
+                        </span>
+                      )}
+                      {minRuntime > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs">
+                          <Clock className="h-3 w-3" /> {minRuntime}+ min
+                        </span>
+                      )}
+                      {excludeDocumentaries && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs">
+                          No docs/TV
+                        </span>
+                      )}
+                      {majorStudiosOnly && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-yellow-100 text-yellow-700 text-xs">
+                          <Building2 className="h-3 w-3" /> Major studios
+                        </span>
+                      )}
+                      {oscarStudiosOnly && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-yellow-100 text-yellow-700 text-xs">
+                          <Award className="h-3 w-3" /> Oscar studios
+                        </span>
+                      )}
+                    </div>
                   )}
-                </span>
+                </div>
                 <button
                   onClick={importAllTMDBMovies}
                   disabled={bulkImporting}
