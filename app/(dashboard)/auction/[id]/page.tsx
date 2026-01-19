@@ -423,19 +423,8 @@ export default function AuctionDetailPage({
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Bid Form */}
           <div className="lg:col-span-2 space-y-4">
-            {movies.map((movie) => (
-              <BidRow
-                key={movie.id}
-                movie={movie}
-                bidAmount={bids.get(movie.id) || 0}
-                savedAmount={savedBids.get(movie.id) || 0}
-                maxBid={team?.budget_remaining || 0}
-                onBidChange={handleBidChange}
-              />
-            ))}
-
             {/* Submit Button */}
-            <div className="sticky bottom-4 bg-white/95 backdrop-blur border border-gray-200 rounded-xl p-4 shadow-lg">
+            <div className="sticky top-4 z-10 bg-white/95 backdrop-blur border border-gray-200 rounded-xl p-4 shadow-lg">
               <div className="flex items-center justify-between gap-4">
                 <div className="text-sm">
                   {!hasEnoughBids ? (
@@ -482,6 +471,17 @@ export default function AuctionDetailPage({
                 </button>
               </div>
             </div>
+
+            {movies.map((movie) => (
+              <BidRow
+                key={movie.id}
+                movie={movie}
+                bidAmount={bids.get(movie.id) || 0}
+                savedAmount={savedBids.get(movie.id) || 0}
+                maxBid={team?.budget_remaining || 0}
+                onBidChange={handleBidChange}
+              />
+            ))}
           </div>
 
           {/* Sidebar */}
