@@ -183,6 +183,10 @@ export default function LeagueMoviesPage() {
     e.preventDefault();
     setSaving(true);
 
+    // Convert metacritic from 0-100 input to 0-1 decimal for storage
+    const metacriticInput = formData.metacritic_score ? parseFloat(formData.metacritic_score) : null;
+    const metacriticDecimal = metacriticInput !== null ? metacriticInput / 100 : null;
+
     const movieData = {
       title: formData.title,
       release_month: formData.release_month,
@@ -190,7 +194,7 @@ export default function LeagueMoviesPage() {
       poster_url: formData.poster_url || null,
       domestic_box_office: formData.domestic_box_office || 0,
       theater_count: formData.theater_count || 0,
-      metacritic_score: formData.metacritic_score ? parseFloat(formData.metacritic_score) : null,
+      metacritic_score: metacriticDecimal,
     };
 
     if (editingId) {
@@ -219,6 +223,8 @@ export default function LeagueMoviesPage() {
   }
 
   function startEdit(movie: Movie) {
+    // Convert metacritic from 0-1 decimal to 0-100 for form display
+    const metacriticDisplay = movie.metacritic_score ? Math.round(movie.metacritic_score * 100).toString() : '';
     setFormData({
       title: movie.title,
       release_month: movie.release_month,
@@ -226,7 +232,7 @@ export default function LeagueMoviesPage() {
       poster_url: movie.poster_url || '',
       domestic_box_office: movie.domestic_box_office || 0,
       theater_count: movie.theater_count || 0,
-      metacritic_score: movie.metacritic_score?.toString() || '',
+      metacritic_score: metacriticDisplay,
     });
     setEditingId(movie.id);
     setShowForm(true);
