@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
 
       // If OMDB doesn't have it, only try scraping if we have box office data
       // (no point scoring metacritic if there's no box office to score against)
-      if (!metacriticScore && data?.domestic_box_office > 0) {
+      if (!metacriticScore && data && data.domestic_box_office > 0) {
         console.log(`OMDB has no Metacritic for ${title}, trying IMDB scrape...`);
         metacriticScore = await scrapeMetacriticScore(imdbId, title, releaseYear);
       } else if (!metacriticScore) {
@@ -291,7 +291,7 @@ export async function PUT(request: NextRequest) {
 
         // If OMDB doesn't have it, only try scraping if we have box office data
         // (no point scoring metacritic if there's no box office to score against)
-        if (!metacriticScore && boxOfficeData?.domestic_box_office > 0) {
+        if (!metacriticScore && boxOfficeData && boxOfficeData.domestic_box_office > 0) {
           console.log(`OMDB has no Metacritic for ${movie.title}, trying IMDB scrape...`);
           metacriticScore = await scrapeMetacriticScore(imdbId, movie.title, movie.release_year);
         }
