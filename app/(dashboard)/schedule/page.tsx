@@ -11,6 +11,8 @@ import Link from 'next/link';
 interface SearchParams {
   tab?: string;
   month?: string;
+  genre?: string;
+  release_type?: string;
 }
 
 export default async function SchedulePage({
@@ -85,6 +87,16 @@ export default async function SchedulePage({
     query = query.eq('release_month', parseInt(params.month));
   }
 
+  // Apply genre filter
+  if (params.genre) {
+    query = query.ilike('genre', `%${params.genre}%`);
+  }
+
+  // Apply release type filter
+  if (params.release_type) {
+    query = query.eq('release_type', params.release_type);
+  }
+
   const { data: movies } = await query;
 
   // Get ownership for my movies tab
@@ -142,7 +154,7 @@ export default async function SchedulePage({
       {tab !== 'my' && (
         <Card className="mb-6">
           <CardContent className="p-4">
-            <form className="flex flex-wrap gap-4">
+            <form className="flex flex-wrap gap-2 sm:gap-4">
               <input type="hidden" name="tab" value={tab} />
               <select
                 name="month"
@@ -155,6 +167,40 @@ export default async function SchedulePage({
                     {getMonthName(m)}
                   </option>
                 ))}
+              </select>
+              <select
+                name="genre"
+                defaultValue={params.genre}
+                className="input w-auto"
+              >
+                <option value="">All Genres</option>
+                <option value="Action">Action</option>
+                <option value="Adventure">Adventure</option>
+                <option value="Animation">Animation</option>
+                <option value="Comedy">Comedy</option>
+                <option value="Crime">Crime</option>
+                <option value="Documentary">Documentary</option>
+                <option value="Drama">Drama</option>
+                <option value="Family">Family</option>
+                <option value="Fantasy">Fantasy</option>
+                <option value="Horror">Horror</option>
+                <option value="Music">Music</option>
+                <option value="Mystery">Mystery</option>
+                <option value="Romance">Romance</option>
+                <option value="Sci-Fi">Sci-Fi</option>
+                <option value="Thriller">Thriller</option>
+                <option value="War">War</option>
+                <option value="Western">Western</option>
+              </select>
+              <select
+                name="release_type"
+                defaultValue={params.release_type}
+                className="input w-auto"
+              >
+                <option value="">All Release Types</option>
+                <option value="wide">Wide</option>
+                <option value="limited">Limited</option>
+                <option value="streaming">Streaming</option>
               </select>
               <button type="submit" className="btn-primary">
                 Filter

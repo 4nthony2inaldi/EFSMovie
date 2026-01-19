@@ -9,7 +9,6 @@ import {
   Users,
   Calendar,
   Gavel,
-  Settings,
   LogOut,
   Menu,
   X,
@@ -22,12 +21,11 @@ import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/standings', label: 'Standings', icon: Trophy },
+  { href: '/schedule', label: 'Schedule', icon: Calendar },
+  { href: '/auction', label: 'Auction', icon: Gavel },
   { href: '/movies', label: 'Movies', icon: Film },
   { href: '/teams', label: 'Teams', icon: Users },
-  { href: '/auction', label: 'Auction', icon: Gavel },
-  { href: '/schedule', label: 'Schedule', icon: Calendar },
   { href: '/rules', label: 'Rules', icon: BookOpen },
-  { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
 interface NavSidebarProps {

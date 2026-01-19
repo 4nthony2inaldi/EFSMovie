@@ -9,6 +9,8 @@ interface SearchParams {
   month?: string;
   owner?: string;
   search?: string;
+  genre?: string;
+  release_type?: string;
 }
 
 export default async function MoviesPage({
@@ -40,6 +42,14 @@ export default async function MoviesPage({
 
   if (params.search) {
     query = query.ilike('title', `%${params.search}%`);
+  }
+
+  if (params.genre) {
+    query = query.ilike('genre', `%${params.genre}%`);
+  }
+
+  if (params.release_type) {
+    query = query.eq('release_type', params.release_type);
   }
 
   const { data: movies } = await query;
@@ -90,12 +100,12 @@ export default async function MoviesPage({
           </div>
 
           {/* Dropdowns row on mobile */}
-          <div className="flex gap-2 sm:contents">
+          <div className="flex flex-wrap gap-2 sm:contents">
             {/* Month Filter */}
             <select
               name="month"
               defaultValue={params.month}
-              className="input flex-1 sm:flex-none sm:w-auto"
+              className="input flex-1 sm:flex-none sm:w-auto min-w-0"
             >
               <option value="">All Months</option>
               {[4, 5, 6, 7, 8, 9, 10, 11, 12, 1].map((m) => (
@@ -105,11 +115,49 @@ export default async function MoviesPage({
               ))}
             </select>
 
+            {/* Genre Filter */}
+            <select
+              name="genre"
+              defaultValue={params.genre}
+              className="input flex-1 sm:flex-none sm:w-auto min-w-0"
+            >
+              <option value="">All Genres</option>
+              <option value="Action">Action</option>
+              <option value="Adventure">Adventure</option>
+              <option value="Animation">Animation</option>
+              <option value="Comedy">Comedy</option>
+              <option value="Crime">Crime</option>
+              <option value="Documentary">Documentary</option>
+              <option value="Drama">Drama</option>
+              <option value="Family">Family</option>
+              <option value="Fantasy">Fantasy</option>
+              <option value="Horror">Horror</option>
+              <option value="Music">Music</option>
+              <option value="Mystery">Mystery</option>
+              <option value="Romance">Romance</option>
+              <option value="Sci-Fi">Sci-Fi</option>
+              <option value="Thriller">Thriller</option>
+              <option value="War">War</option>
+              <option value="Western">Western</option>
+            </select>
+
+            {/* Release Type Filter */}
+            <select
+              name="release_type"
+              defaultValue={params.release_type}
+              className="input flex-1 sm:flex-none sm:w-auto min-w-0"
+            >
+              <option value="">All Release Types</option>
+              <option value="wide">Wide</option>
+              <option value="limited">Limited</option>
+              <option value="streaming">Streaming</option>
+            </select>
+
             {/* Owner Filter */}
             <select
               name="owner"
               defaultValue={params.owner}
-              className="input flex-1 sm:flex-none sm:w-auto"
+              className="input flex-1 sm:flex-none sm:w-auto min-w-0"
             >
               <option value="">All Movies</option>
               <option value="owned">Owned</option>
