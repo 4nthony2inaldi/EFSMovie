@@ -18,8 +18,13 @@ export async function getMovieRatings(imdbId: string): Promise<{
   rottenTomatoes: number | null;
   imdbRating: number | null;
 }> {
+  if (!process.env.OMDB_API_KEY) {
+    console.error('OMDB_API_KEY environment variable is not set');
+    throw new Error('OMDB_API_KEY not configured');
+  }
+
   const params = new URLSearchParams({
-    apikey: process.env.OMDB_API_KEY!,
+    apikey: process.env.OMDB_API_KEY,
     i: imdbId,
   });
 
@@ -29,12 +34,20 @@ export async function getMovieRatings(imdbId: string): Promise<{
     throw new Error(`OMDb request failed: ${res.status}`);
   }
 
-  const data: OMDBMovie = await res.json();
+  const data = await res.json();
+
+  // OMDB returns { Response: "False", Error: "..." } on errors
+  if (data.Response === 'False') {
+    console.log(`OMDB returned error for ${imdbId}: ${data.Error}`);
+    return { metacritic: null, rottenTomatoes: null, imdbRating: null };
+  }
 
   // Parse Metacritic score (store as decimal 0-1, e.g., 85 -> 0.85)
   const metacritic = data.Metascore && data.Metascore !== 'N/A'
     ? parseInt(data.Metascore) / 100
     : null;
+
+  console.log(`OMDB data for ${imdbId}: Metascore=${data.Metascore}, parsed=${metacritic}`);
 
   // Parse Rotten Tomatoes score
   const rtRating = data.Ratings?.find((r) => r.Source === 'Rotten Tomatoes');
