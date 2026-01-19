@@ -41,6 +41,7 @@ export default function AuctionDetailPage({
   const [submitting, setSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [results, setResults] = useState<any[] | null>(null);
+  const [teamCount, setTeamCount] = useState(0);
 
   // Load auction data
   useEffect(() => {
@@ -63,15 +64,25 @@ export default function AuctionDetailPage({
       if (!teamData) return;
       setTeam(teamData);
 
-      // Get auction
+      // Get auction with league info
       const { data: auctionData } = await supabase
         .from('auctions')
-        .select('*')
+        .select('*, league:leagues(id)')
         .eq('id', auctionId)
         .single();
 
       if (!auctionData) return;
       setAuction(auctionData);
+
+      // Get team count in league
+      const leagueId = (auctionData.league as { id: string })?.id;
+      if (leagueId) {
+        const { count } = await supabase
+          .from('teams')
+          .select('*', { count: 'exact', head: true })
+          .eq('league_id', leagueId);
+        setTeamCount(count || 0);
+      }
 
       // Get auction movies
       const { data: auctionMovies } = await supabase
@@ -231,6 +242,9 @@ export default function AuctionDetailPage({
 
   const totalBids = Array.from(bids.values()).reduce((sum, b) => sum + b, 0);
   const isOverBudget = totalBids > (team?.budget_remaining || 0);
+  const nonZeroBidCount = Array.from(bids.values()).filter((b) => b > 0).length;
+  const minRequiredBids = teamCount * 2;
+  const hasEnoughBids = nonZeroBidCount >= minRequiredBids;
 
   // Show results if resolved
   if (auction.status === 'resolved' && results) {
@@ -424,7 +438,12 @@ export default function AuctionDetailPage({
             <div className="sticky bottom-4 bg-white/95 backdrop-blur border border-gray-200 rounded-xl p-4 shadow-lg">
               <div className="flex items-center justify-between gap-4">
                 <div className="text-sm">
-                  {hasUnsavedChanges() ? (
+                  {!hasEnoughBids ? (
+                    <span className="text-red-600 flex items-center gap-1.5">
+                      <AlertTriangle className="h-4 w-4" />
+                      Bid on at least {minRequiredBids} movies ({nonZeroBidCount}/{minRequiredBids})
+                    </span>
+                  ) : hasUnsavedChanges() ? (
                     <span className="text-amber-600 flex items-center gap-1.5">
                       <AlertTriangle className="h-4 w-4" />
                       You have unsaved changes
@@ -436,20 +455,22 @@ export default function AuctionDetailPage({
                     </span>
                   ) : (
                     <span className="text-gray-500">
-                      {bids.size} movie{bids.size !== 1 ? 's' : ''} • {formatCurrency(totalBids)} total
+                      {nonZeroBidCount} movie{nonZeroBidCount !== 1 ? 's' : ''} • {formatCurrency(totalBids)} total
                     </span>
                   )}
                 </div>
                 <button
                   onClick={submitBids}
-                  disabled={submitting || isOverBudget || !hasUnsavedChanges()}
+                  disabled={submitting || isOverBudget || !hasEnoughBids || !hasUnsavedChanges()}
                   className={cn(
                     "flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-colors",
                     isOverBudget
                       ? "bg-red-100 text-red-700 cursor-not-allowed"
-                      : hasUnsavedChanges()
-                        ? "bg-purple-600 text-white hover:bg-purple-700"
-                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      : !hasEnoughBids
+                        ? "bg-red-100 text-red-700 cursor-not-allowed"
+                        : hasUnsavedChanges()
+                          ? "bg-purple-600 text-white hover:bg-purple-700"
+                          : "bg-gray-100 text-gray-400 cursor-not-allowed"
                   )}
                 >
                   {submitting ? (
@@ -457,7 +478,7 @@ export default function AuctionDetailPage({
                   ) : (
                     <Send className="h-4 w-4" />
                   )}
-                  {submitting ? 'Submitting...' : isOverBudget ? 'Over Budget!' : 'Submit Bids'}
+                  {submitting ? 'Submitting...' : isOverBudget ? 'Over Budget!' : !hasEnoughBids ? `Need ${minRequiredBids - nonZeroBidCount} More` : 'Submit Bids'}
                 </button>
               </div>
             </div>
@@ -474,6 +495,33 @@ export default function AuctionDetailPage({
               totalBudget={team?.budget_remaining || 0}
               totalBids={totalBids}
             />
+
+            {/* Minimum Bids Requirement */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-gray-700">Minimum Bids</span>
+                  <span className={cn(
+                    "text-sm font-semibold",
+                    hasEnoughBids ? "text-green-600" : "text-red-600"
+                  )}>
+                    {nonZeroBidCount} / {minRequiredBids}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className={cn(
+                      "h-2 rounded-full transition-all",
+                      hasEnoughBids ? "bg-green-500" : "bg-red-500"
+                    )}
+                    style={{ width: `${Math.min(100, (nonZeroBidCount / minRequiredBids) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  You must bid on at least {minRequiredBids} movies ({teamCount} teams x 2)
+                </p>
+              </CardContent>
+            </Card>
           </div>
         </div>
       )}
