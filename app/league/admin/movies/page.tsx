@@ -425,8 +425,10 @@ export default function LeagueMoviesPage() {
 
     let message = `Import completed: ${successCount} imported`;
     if (skippedCount > 0) {
-      const skipReason = majorStudiosOnly ? 'no major studio' : 'no Oscar-caliber studio';
-      message += `, ${skippedCount} skipped (${skipReason})`;
+      const skipReasons: string[] = [];
+      if (majorStudiosOnly) skipReasons.push('major studio');
+      if (oscarStudiosOnly) skipReasons.push('Oscar-caliber studio');
+      message += `, ${skippedCount} skipped (no ${skipReasons.join(' or ')})`;
     }
     if (failCount > 0) {
       message += `, ${failCount} failed.\nLast error: ${lastError}\n\nIf all failed, you may need to add an INSERT policy in Supabase.`;
@@ -766,10 +768,7 @@ export default function LeagueMoviesPage() {
                   <input
                     type="checkbox"
                     checked={majorStudiosOnly}
-                    onChange={(e) => {
-                      setMajorStudiosOnly(e.target.checked);
-                      if (e.target.checked) setOscarStudiosOnly(false);
-                    }}
+                    onChange={(e) => setMajorStudiosOnly(e.target.checked)}
                     className="w-4 h-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
                   />
                   <span className="flex items-center gap-1 text-sm font-medium text-gray-700">
@@ -782,10 +781,7 @@ export default function LeagueMoviesPage() {
                   <input
                     type="checkbox"
                     checked={oscarStudiosOnly}
-                    onChange={(e) => {
-                      setOscarStudiosOnly(e.target.checked);
-                      if (e.target.checked) setMajorStudiosOnly(false);
-                    }}
+                    onChange={(e) => setOscarStudiosOnly(e.target.checked)}
                     className="w-4 h-4 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
                   />
                   <span className="flex items-center gap-1 text-sm font-medium text-gray-700">
@@ -795,6 +791,11 @@ export default function LeagueMoviesPage() {
                   </span>
                 </label>
               </div>
+              {majorStudiosOnly && oscarStudiosOnly && (
+                <p className="text-xs text-yellow-600 mt-2">
+                  Note: Both enabled = movie must match Major Studios list (stricter)
+                </p>
+              )}
             </div>
 
             {/* Import All Button */}
