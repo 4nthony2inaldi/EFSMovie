@@ -33,9 +33,10 @@ export function calculateMovieScore(stats: MovieStats): ScoreBreakdown {
     bestPictureWon,
   } = stats;
 
-  // Metacritic is stored as decimal (0.85 for 85%), convert to 0-100 for calculations
+  // Metacritic is stored as decimal (0.85 for 85%)
   const metacriticDecimal = metacriticScore ?? 0;
-  const metacritic = metacriticDecimal * 100;
+  // Keep 0-100 scale for display purposes
+  const metacriticDisplay = metacriticDecimal * 100;
 
   // Box office component (must be in 5+ theaters)
   let boxOfficeComponent = 0;
@@ -43,12 +44,12 @@ export function calculateMovieScore(stats: MovieStats): ScoreBreakdown {
     boxOfficeComponent = Math.min((domesticBoxOffice / theaterCount) / 1000, 15);
   }
 
-  // Raw base score
-  const rawBaseScore = boxOfficeComponent * metacritic;
+  // Raw base score (using decimal metacritic as multiplier)
+  const rawBaseScore = boxOfficeComponent * metacriticDecimal;
 
-  // Floor rule: minimum is metacritic score
-  const floorApplied = rawBaseScore < metacritic;
-  const baseScore = floorApplied ? metacritic : rawBaseScore;
+  // Floor rule: minimum is metacritic score (as decimal)
+  const floorApplied = rawBaseScore < metacriticDecimal;
+  const baseScore = floorApplied ? metacriticDecimal : rawBaseScore;
 
   // Oscar points
   const oscarNomPoints = oscarNominations * 0.5;
@@ -62,7 +63,7 @@ export function calculateMovieScore(stats: MovieStats): ScoreBreakdown {
 
   return {
     boxOfficeComponent: Math.round(boxOfficeComponent * 1000) / 1000,
-    metacriticScore: metacritic,
+    metacriticScore: metacriticDisplay,
     rawBaseScore: Math.round(rawBaseScore * 100) / 100,
     floorApplied,
     baseScore: Math.round(baseScore * 100) / 100,

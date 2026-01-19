@@ -52,7 +52,7 @@ export function ScoreBreakdown({ stats }: ScoreBreakdownProps) {
             <div className="text-gray-600">Base Score</div>
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="text-gray-700">
-                {breakdown.boxOfficeComponent.toFixed(3)} × {breakdown.metacriticScore.toFixed(0)} (Metacritic)
+                {breakdown.boxOfficeComponent.toFixed(3)} × {breakdown.metacriticScore.toFixed(0)}% (Metacritic)
               </div>
               <div className="font-semibold text-purple-600">
                 = {breakdown.rawBaseScore.toFixed(2)}
@@ -67,12 +67,12 @@ export function ScoreBreakdown({ stats }: ScoreBreakdownProps) {
               {breakdown.floorApplied ? (
                 <div className="flex items-center gap-2 text-gold-600">
                   <CheckCircle className="h-4 w-4" />
-                  <span>Base score ({breakdown.rawBaseScore.toFixed(2)}) &lt; Metacritic ({breakdown.metacriticScore.toFixed(0)})</span>
+                  <span>Base score ({breakdown.rawBaseScore.toFixed(2)}) &lt; Metacritic floor ({(breakdown.metacriticScore / 100).toFixed(2)})</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-green-600">
                   <CheckCircle className="h-4 w-4" />
-                  <span>Base score ({breakdown.rawBaseScore.toFixed(2)}) ≥ Metacritic ({breakdown.metacriticScore.toFixed(0)})</span>
+                  <span>Base score ({breakdown.rawBaseScore.toFixed(2)}) ≥ Metacritic floor ({(breakdown.metacriticScore / 100).toFixed(2)})</span>
                 </div>
               )}
               <div className="font-semibold text-purple-600 mt-1">
