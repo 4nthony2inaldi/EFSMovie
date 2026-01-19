@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { MovieCard } from '@/components/movies/movie-card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { formatDate, getMonthName, isPast, isFuture } from '@/lib/utils';
-import { Calendar, Film, Clock, Gavel } from 'lucide-react';
+import { Calendar, Film, Clock } from 'lucide-react';
 import Link from 'next/link';
 
 // Force dynamic rendering to ensure filters work correctly
@@ -26,7 +26,7 @@ export default async function SchedulePage({
 }) {
   const params = await searchParams;
   const supabase = await createClient();
-  const tab = params.tab || 'upcoming';
+  const tab = params.tab || 'all';
 
   // Get user's team and league
   const { data: { user } } = await supabase.auth.getUser();
@@ -62,15 +62,12 @@ export default async function SchedulePage({
   }
 
   // Then apply tab-specific filters and ordering
-  if (tab === 'upcoming') {
-    // Movies from current month onward (show all of current month, not just future dates)
-    // This ensures movies released earlier in the current month still appear
+  if (tab === 'all') {
+    // All movies, ordered by release date
     query = query
-      .or(`release_year.gt.${currentYear},and(release_year.eq.${currentYear},release_month.gte.${currentMonth})`)
-      .order('release_date', { ascending: true })
-      .limit(50);
+      .order('release_date', { ascending: true });
   } else if (tab === 'theaters') {
-    // Movies currently in theaters (released in last 3 months)
+    // Movies currently in theaters (released in last 3 months with theater count)
     const threeMonthsAgo = new Date(today);
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
     query = query
@@ -78,47 +75,14 @@ export default async function SchedulePage({
       .lte('release_date', today.toISOString().split('T')[0])
       .gt('theater_count', 0)
       .order('domestic_box_office', { ascending: false });
-  } else if (tab === 'auction') {
-    // Movies in next auction
-    const { data: nextAuction } = await supabase
-      .from('auctions')
-      .select('id')
-      .eq('league_id', team?.league_id)
-      .in('status', ['upcoming', 'open'])
-      .order('opens_at', { ascending: true })
-      .limit(1)
-      .single();
-
-    if (nextAuction) {
-      const { data: auctionMovies } = await supabase
-        .from('auction_movies')
-        .select('movie_id')
-        .eq('auction_id', nextAuction.id);
-
-      const movieIds = auctionMovies?.map((am) => am.movie_id) || [];
-      if (movieIds.length > 0) {
-        query = query.in('id', movieIds);
-      } else {
-        query = query.eq('id', '00000000-0000-0000-0000-000000000000'); // No results
-      }
-    } else {
-      query = query.eq('id', '00000000-0000-0000-0000-000000000000'); // No results
-    }
+  } else if (tab === 'upcoming') {
+    // Movies not yet released (release_date >= today)
+    query = query
+      .gte('release_date', today.toISOString().split('T')[0])
+      .order('release_date', { ascending: true });
   }
 
   const { data: movies } = await query;
-
-  // Get ownership for my movies tab
-  let myMovies: any[] = [];
-  if (tab === 'my' && team) {
-    const { data: teamMovies } = await supabase
-      .from('team_movies')
-      .select('*, movie:movies(*)')
-      .eq('team_id', team.id)
-      .order('acquired_at', { ascending: false });
-
-    myMovies = teamMovies?.map((tm) => tm.movie).filter(Boolean) || [];
-  }
 
   // Get ownership info for display
   const { data: teamMovies } = await supabase
@@ -146,19 +110,16 @@ export default async function SchedulePage({
   });
   const studios = Array.from(studioSet).sort();
 
-  const displayMovies = tab === 'my' ? myMovies : (movies || []);
+  const displayMovies = movies || [];
 
   // Build tab URLs that preserve filter params
   const buildTabUrl = (tabName: string) => {
     const searchParams = new URLSearchParams();
     searchParams.set('tab', tabName);
-    // Preserve filter params when switching tabs (except for 'my' tab which doesn't use filters)
-    if (tabName !== 'my') {
-      if (params.month) searchParams.set('month', params.month);
-      if (params.genre) searchParams.set('genre', params.genre);
-      if (params.release_type) searchParams.set('release_type', params.release_type);
-      if (params.studio) searchParams.set('studio', params.studio);
-    }
+    if (params.month) searchParams.set('month', params.month);
+    if (params.genre) searchParams.set('genre', params.genre);
+    if (params.release_type) searchParams.set('release_type', params.release_type);
+    if (params.studio) searchParams.set('studio', params.studio);
     return `/schedule?${searchParams.toString()}`;
   };
 
@@ -168,27 +129,22 @@ export default async function SchedulePage({
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-2 mb-6">
+        <TabButton href={buildTabUrl('all')} active={tab === 'all'}>
+          <Film className="h-4 w-4" />
+          All Movies
+        </TabButton>
+        <TabButton href={buildTabUrl('theaters')} active={tab === 'theaters'}>
+          <Clock className="h-4 w-4" />
+          In Theaters
+        </TabButton>
         <TabButton href={buildTabUrl('upcoming')} active={tab === 'upcoming'}>
           <Calendar className="h-4 w-4" />
           Upcoming
         </TabButton>
-        <TabButton href={buildTabUrl('theaters')} active={tab === 'theaters'}>
-          <Film className="h-4 w-4" />
-          Now in Theaters
-        </TabButton>
-        <TabButton href={buildTabUrl('my')} active={tab === 'my'}>
-          <Clock className="h-4 w-4" />
-          My Movies
-        </TabButton>
-        <TabButton href={buildTabUrl('auction')} active={tab === 'auction'}>
-          <Gavel className="h-4 w-4" />
-          Next Auction
-        </TabButton>
       </div>
 
       {/* Filters */}
-      {tab !== 'my' && (
-        <Card className="mb-6">
+      <Card className="mb-6">
           <CardContent className="p-4">
             <form className="flex flex-wrap gap-2 sm:gap-4">
               <input type="hidden" name="tab" value={tab} />
@@ -256,32 +212,18 @@ export default async function SchedulePage({
             </form>
           </CardContent>
         </Card>
-      )}
 
       {/* Movies */}
       {displayMovies.length === 0 ? (
         <EmptyState
           icon={<Film className="h-12 w-12" />}
           title="No movies found"
-          description={
-            tab === 'my'
-              ? "You haven't won any movies yet. Head to the auction to start bidding!"
-              : tab === 'auction'
-                ? "No auction is currently scheduled."
-                : "No movies match your criteria."
-          }
-          action={
-            tab === 'my' ? (
-              <Link href="/auction" className="btn-primary">
-                Go to Auction
-              </Link>
-            ) : undefined
-          }
+          description="No movies match your criteria."
         />
       ) : (
         <>
-          {/* Group by month if showing upcoming */}
-          {tab === 'upcoming' ? (
+          {/* Group by month for all and upcoming tabs */}
+          {(tab === 'all' || tab === 'upcoming') ? (
             <GroupedMovies movies={displayMovies} ownershipMap={ownershipMap} />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
