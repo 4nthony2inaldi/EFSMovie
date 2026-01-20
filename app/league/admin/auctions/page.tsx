@@ -101,23 +101,31 @@ export default function LeagueAuctionsPage() {
 
     let auctionId = editingId;
 
-    if (editingId) {
-      await supabase.from('auctions').update(auctionData).eq('id', editingId);
-    } else {
-      const { data } = await supabase.from('auctions').insert(auctionData).select().single();
-      auctionId = data?.id;
-    }
+    try {
+      if (editingId) {
+        await supabase.from('auctions').update(auctionData).eq('id', editingId);
+      } else {
+        const { data } = await supabase.from('auctions').insert(auctionData).select().single();
+        auctionId = data?.id;
+      }
 
-    // Update auction movies
-    if (auctionId && selectedMovies.length > 0) {
-      // Remove existing
-      await supabase.from('auction_movies').delete().eq('auction_id', auctionId);
-      // Add new
-      const auctionMovies = selectedMovies.map(movieId => ({
-        auction_id: auctionId,
-        movie_id: movieId,
-      }));
-      await supabase.from('auction_movies').insert(auctionMovies);
+      // Update auction movies via API (bypasses RLS issues)
+      if (auctionId) {
+        const response = await fetch(`/api/auctions/${auctionId}/movies`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ movie_ids: selectedMovies }),
+        });
+
+        if (!response.ok) {
+          const data = await response.json();
+          console.error('Failed to update auction movies:', data.error);
+          alert(`Auction saved but failed to update movies: ${data.error}`);
+        }
+      }
+    } catch (error) {
+      console.error('Error saving auction:', error);
+      alert('Failed to save auction');
     }
 
     setSaving(false);
