@@ -4,13 +4,24 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id: auctionId } = await params;
+  const auctionId = params.id;
 
   try {
+    // Check if service role key is configured
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('SUPABASE_SERVICE_ROLE_KEY is not configured');
+      return NextResponse.json(
+        { error: 'Server configuration error: missing service role key' },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
     const { movie_ids } = body;
+
+    console.log('Updating auction movies for auction:', auctionId, 'with', movie_ids?.length, 'movies');
 
     if (!Array.isArray(movie_ids)) {
       return NextResponse.json(
@@ -50,6 +61,7 @@ export async function PUT(
     const adminSupabase = createAdminClient();
 
     // Remove existing commissioner-added movies (those with null added_by_team_id)
+    console.log('Deleting existing commissioner-added movies for auction:', auctionId);
     const { error: deleteError } = await adminSupabase
       .from('auction_movies')
       .delete()
@@ -59,13 +71,15 @@ export async function PUT(
     if (deleteError) {
       console.error('Failed to delete existing auction movies:', deleteError);
       return NextResponse.json(
-        { error: 'Failed to update auction movies' },
+        { error: `Failed to delete existing movies: ${deleteError.message}` },
         { status: 500 }
       );
     }
+    console.log('Successfully deleted existing commissioner-added movies');
 
     // Add new movies (if any)
     if (movie_ids.length > 0) {
+      console.log('Inserting', movie_ids.length, 'movies for auction:', auctionId);
       const auctionMovies = movie_ids.map((movieId: string) => ({
         auction_id: auctionId,
         movie_id: movieId,
@@ -79,10 +93,11 @@ export async function PUT(
       if (insertError) {
         console.error('Failed to insert auction movies:', insertError);
         return NextResponse.json(
-          { error: 'Failed to add movies to auction' },
+          { error: `Failed to add movies: ${insertError.message}` },
           { status: 500 }
         );
       }
+      console.log('Successfully inserted', movie_ids.length, 'movies');
     }
 
     return NextResponse.json({
@@ -102,9 +117,9 @@ export async function PUT(
 // GET endpoint to fetch auction movies
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id: auctionId } = await params;
+  const auctionId = params.id;
 
   try {
     const supabase = await createClient();
