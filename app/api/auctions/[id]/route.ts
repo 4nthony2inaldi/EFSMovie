@@ -58,19 +58,46 @@ export async function DELETE(
     }
 
     // Delete related records in order (foreign key constraints)
-    await adminSupabase.from('team_movies').delete().eq('auction_id', auctionId);
-    await adminSupabase.from('bids').delete().eq('auction_id', auctionId);
-    await adminSupabase.from('auction_movies').delete().eq('auction_id', auctionId);
-    await adminSupabase.from('standings_snapshots').delete().eq('auction_id', auctionId);
+    // team_movies must be deleted first since it has a FK to auctions without cascade
+    const { error: teamMoviesError } = await adminSupabase
+      .from('team_movies')
+      .delete()
+      .eq('auction_id', auctionId);
+    if (teamMoviesError) {
+      throw new Error(`Failed to delete team movies: ${teamMoviesError.message}`);
+    }
+
+    const { error: bidsError } = await adminSupabase
+      .from('bids')
+      .delete()
+      .eq('auction_id', auctionId);
+    if (bidsError) {
+      throw new Error(`Failed to delete bids: ${bidsError.message}`);
+    }
+
+    const { error: auctionMoviesError } = await adminSupabase
+      .from('auction_movies')
+      .delete()
+      .eq('auction_id', auctionId);
+    if (auctionMoviesError) {
+      throw new Error(`Failed to delete auction movies: ${auctionMoviesError.message}`);
+    }
+
+    const { error: snapshotsError } = await adminSupabase
+      .from('standings_snapshots')
+      .delete()
+      .eq('auction_id', auctionId);
+    if (snapshotsError) {
+      throw new Error(`Failed to delete standings snapshots: ${snapshotsError.message}`);
+    }
 
     // Finally delete the auction itself
     const { error: deleteError } = await adminSupabase
       .from('auctions')
       .delete()
       .eq('id', auctionId);
-
     if (deleteError) {
-      throw deleteError;
+      throw new Error(`Failed to delete auction: ${deleteError.message}`);
     }
 
     return NextResponse.json({ success: true });
