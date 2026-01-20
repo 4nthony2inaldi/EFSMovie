@@ -633,9 +633,10 @@ export default function AuctionDetailPage({
                           ? "bg-purple-100 text-purple-700 border border-purple-300"
                           : "border border-gray-200 text-gray-600 hover:bg-gray-50"
                       )}
+                      title="Add movies from TMDB that weren't included by the commissioner"
                     >
                       <Globe className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                      <span className="hidden sm:inline">Add Movies</span>
+                      <span className="hidden sm:inline">{movies.length > 0 ? 'Add More' : 'Add Movies'}</span>
                       {userAddedCount < MAX_USER_ADDITIONS && (
                         <Badge variant="purple" className="ml-1 text-xs">
                           {MAX_USER_ADDITIONS - userAddedCount}
@@ -694,6 +695,29 @@ export default function AuctionDetailPage({
                   onMovieAdded={reloadMovies}
                   onClose={() => setShowTmdbBrowser(false)}
                 />
+              )}
+
+              {/* Empty state when no movies in auction */}
+              {movies.length === 0 && !showTmdbBrowser && (
+                <Card className="border-dashed border-2 border-gray-300">
+                  <CardContent className="py-12 text-center">
+                    <Film className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      No movies in this auction yet
+                    </h3>
+                    <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                      The commissioner needs to add movies to this auction before bidding can begin.
+                      You can also add up to {MAX_USER_ADDITIONS} movies from TMDB.
+                    </p>
+                    <button
+                      onClick={() => setShowTmdbBrowser(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                    >
+                      <Globe className="h-4 w-4" />
+                      Browse Movies from TMDB
+                    </button>
+                  </CardContent>
+                </Card>
               )}
 
               {movies.map((movie) => (

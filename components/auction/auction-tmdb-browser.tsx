@@ -154,7 +154,7 @@ export function AuctionTmdbBrowser({
           </button>
         </div>
         <p className="text-sm text-gray-600 mt-1">
-          Browse {MONTH_NAMES[forMonth - 1]} {forYear} movies that weren&apos;t included in the auction
+          Add additional {MONTH_NAMES[forMonth - 1]} {forYear} movies from TMDB that weren&apos;t included by the commissioner
         </p>
       </CardHeader>
       <CardContent>
