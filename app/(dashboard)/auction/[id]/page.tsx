@@ -25,7 +25,11 @@ import {
   Send,
   X,
   Trash2,
+  Globe,
+  Plus,
+  User,
 } from 'lucide-react';
+import { AuctionTmdbBrowser } from '@/components/auction/auction-tmdb-browser';
 
 export default function AuctionDetailPage({
   params,
@@ -47,6 +51,12 @@ export default function AuctionDetailPage({
   const [teamCount, setTeamCount] = useState(0);
   const [seasonEndMonth, setSeasonEndMonth] = useState<number | null>(null);
   const [seasonEndYear, setSeasonEndYear] = useState<number | null>(null);
+  const [showTmdbBrowser, setShowTmdbBrowser] = useState(false);
+  const [existingTmdbIds, setExistingTmdbIds] = useState<number[]>([]);
+  const [userAddedCount, setUserAddedCount] = useState(0);
+  const [userAddedMovieIds, setUserAddedMovieIds] = useState<Set<string>>(new Set());
+
+  const MAX_USER_ADDITIONS = 2;
 
   // Load auction data
   useEffect(() => {
@@ -91,16 +101,37 @@ export default function AuctionDetailPage({
         setSeasonEndYear(league.season_end_year);
       }
 
-      // Get auction movies
+      // Get auction movies with added_by_team_id
       const { data: auctionMovies } = await supabase
         .from('auction_movies')
-        .select('movie:movies(*)')
+        .select('movie_id, added_by_team_id, movie:movies(*)')
         .eq('auction_id', auctionId);
 
       const movieList = (auctionMovies || [])
         .map((am) => (am as unknown as { movie: Movie }).movie)
         .filter((m): m is Movie => m != null);
       setMovies(movieList);
+
+      // Track TMDB IDs and user-added movies
+      const tmdbIds: number[] = [];
+      const userAdded = new Set<string>();
+      let userAddCount = 0;
+
+      auctionMovies?.forEach((am: any) => {
+        if (am.movie?.tmdb_id) {
+          tmdbIds.push(am.movie.tmdb_id);
+        }
+        if (am.added_by_team_id) {
+          userAdded.add(am.movie_id);
+          if (am.added_by_team_id === teamData.id) {
+            userAddCount++;
+          }
+        }
+      });
+
+      setExistingTmdbIds(tmdbIds);
+      setUserAddedMovieIds(userAdded);
+      setUserAddedCount(userAddCount);
 
       // Get existing bids
       const { data: existingBids } = await supabase
@@ -162,6 +193,42 @@ export default function AuctionDetailPage({
 
     loadData();
   }, [auctionId, supabase, router]);
+
+  // Reload movies when a new movie is added via TMDB browser
+  const reloadMovies = useCallback(async () => {
+    if (!team) return;
+
+    const { data: auctionMovies } = await supabase
+      .from('auction_movies')
+      .select('movie_id, added_by_team_id, movie:movies(*)')
+      .eq('auction_id', auctionId);
+
+    const movieList = (auctionMovies || [])
+      .map((am) => (am as unknown as { movie: Movie }).movie)
+      .filter((m): m is Movie => m != null);
+    setMovies(movieList);
+
+    // Update TMDB IDs and user-added movies
+    const tmdbIds: number[] = [];
+    const userAdded = new Set<string>();
+    let userAddCount = 0;
+
+    auctionMovies?.forEach((am: any) => {
+      if (am.movie?.tmdb_id) {
+        tmdbIds.push(am.movie.tmdb_id);
+      }
+      if (am.added_by_team_id) {
+        userAdded.add(am.movie_id);
+        if (am.added_by_team_id === team.id) {
+          userAddCount++;
+        }
+      }
+    });
+
+    setExistingTmdbIds(tmdbIds);
+    setUserAddedMovieIds(userAdded);
+    setUserAddedCount(userAddCount);
+  }, [auctionId, supabase, team]);
 
   // Handle bid change (local only - not saved until submit)
   const handleBidChange = (movieId: string, amount: number) => {
@@ -558,6 +625,23 @@ export default function AuctionDetailPage({
                     )}
                   </div>
                   <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => setShowTmdbBrowser(!showTmdbBrowser)}
+                      className={cn(
+                        "flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-lg font-medium transition-colors text-xs sm:text-sm",
+                        showTmdbBrowser
+                          ? "bg-purple-100 text-purple-700 border border-purple-300"
+                          : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                      )}
+                    >
+                      <Globe className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      <span className="hidden sm:inline">Add Movies</span>
+                      {userAddedCount < MAX_USER_ADDITIONS && (
+                        <Badge variant="purple" className="ml-1 text-xs">
+                          {MAX_USER_ADDITIONS - userAddedCount}
+                        </Badge>
+                      )}
+                    </button>
                     {savedBids.size > 0 && (
                       <button
                         onClick={unsubmitAllBids}
@@ -598,6 +682,20 @@ export default function AuctionDetailPage({
                 </div>
               </div>
 
+              {/* TMDB Browser */}
+              {showTmdbBrowser && auction && (
+                <AuctionTmdbBrowser
+                  auctionId={auctionId}
+                  forMonth={auction.for_month}
+                  forYear={auction.for_year}
+                  existingTmdbIds={existingTmdbIds}
+                  userAddedCount={userAddedCount}
+                  maxUserAdditions={MAX_USER_ADDITIONS}
+                  onMovieAdded={reloadMovies}
+                  onClose={() => setShowTmdbBrowser(false)}
+                />
+              )}
+
               {movies.map((movie) => (
                 <BidRow
                   key={movie.id}
@@ -607,6 +705,7 @@ export default function AuctionDetailPage({
                   maxBid={team?.budget_remaining || 0}
                   onBidChange={handleBidChange}
                   onClearBid={handleClearBid}
+                  isUserAdded={userAddedMovieIds.has(movie.id)}
                 />
               ))}
             </div>
@@ -732,6 +831,7 @@ function BidRow({
   maxBid,
   onBidChange,
   onClearBid,
+  isUserAdded = false,
 }: {
   movie: Movie;
   bidAmount: number;
@@ -739,6 +839,7 @@ function BidRow({
   maxBid: number;
   onBidChange: (movieId: string, amount: number) => void;
   onClearBid: (movieId: string) => void;
+  isUserAdded?: boolean;
 }) {
   const [value, setValue] = useState(bidAmount > 0 ? bidAmount.toString() : '');
 
@@ -799,6 +900,12 @@ function BidRow({
              releaseType === 'limited' ? 'Limited' :
              releaseType === 'streaming' ? 'Streaming' : '?'}
           </Badge>
+          {isUserAdded && (
+            <Badge variant="default" className="bg-blue-100 text-blue-700 border-blue-200">
+              <User className="h-3 w-3 mr-1" />
+              Added
+            </Badge>
+          )}
           <span className="text-xs sm:text-sm text-gray-500">
             Score: {formatScore(movie.calculated_score)}
           </span>

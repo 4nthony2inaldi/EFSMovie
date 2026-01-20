@@ -73,6 +73,7 @@ export interface AuctionMovie {
   id: string;
   auction_id: string;
   movie_id: string;
+  added_by_team_id: string | null; // NULL = commissioner added, otherwise user-added
   created_at: string;
 }
 
