@@ -4,10 +4,10 @@ import { resolveAuction } from '@/lib/auction';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
-  const auctionId = params.id;
+  const { id: auctionId } = await params;
 
   // Check if user is logged in
   const { data: { user } } = await supabase.auth.getUser();

@@ -4,10 +4,10 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
-  const auctionId = params.id;
+  const { id: auctionId } = await params;
 
   // Check if user is logged in
   const { data: { user } } = await supabase.auth.getUser();

@@ -7,9 +7,9 @@ const MAX_USER_ADDED_MOVIES = 2;
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const auctionId = params.id;
+  const { id: auctionId } = await params;
 
   try {
     const body = await request.json();
