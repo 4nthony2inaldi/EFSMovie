@@ -15,6 +15,7 @@ interface MovieAssignment {
  * - Ties are broken by:
  *   1. Lower-ranked team wins (worse standing = wins)
  *   2. Random tiebreaker for true ties (e.g., at season start when all teams are at 0)
+ * - Teams that submit no bids are auto-assigned 2 random unowned movies at $2 each
  */
 export async function resolveAuction(auctionId: string): Promise<MovieAssignment[]> {
   const supabase = createAdminClient();
@@ -124,7 +125,50 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
     // If no eligible bidder found, movie goes unowned
   }
 
-  // 8. Save assignments to team_movies
+  // 8. Auto-assign movies to teams that didn't submit any bids
+  // Get all teams in the league
+  const { data: allTeams } = await supabase
+    .from('teams')
+    .select('id')
+    .eq('league_id', leagueId);
+
+  // Find teams that submitted zero bids for this auction
+  const teamsWithBids = new Set((allBids || []).map((bid) => bid.team_id));
+  const teamsWithNoBids = (allTeams || []).filter(
+    (team) => !teamsWithBids.has(team.id)
+  );
+
+  // Find movies that weren't won (not in assignments)
+  const wonMovieIds = new Set(assignments.map((a) => a.movieId));
+  const unownedMovies = (auctionMovies || [])
+    .filter((am) => !wonMovieIds.has(am.movie_id))
+    .map((am) => am.movie_id);
+
+  // Shuffle unowned movies for random assignment
+  const shuffledUnownedMovies = [...unownedMovies].sort(() => Math.random() - 0.5);
+
+  // Auto-assign 2 movies at $2 each to each team that didn't bid
+  const AUTO_ASSIGN_PRICE = 2;
+  const AUTO_ASSIGN_COUNT = 2;
+
+  for (const team of teamsWithNoBids) {
+    const currentWins = teamWinCount.get(team.id) || 0;
+    const moviesToAssign = Math.min(AUTO_ASSIGN_COUNT - currentWins, shuffledUnownedMovies.length);
+
+    for (let i = 0; i < moviesToAssign; i++) {
+      const movieId = shuffledUnownedMovies.shift();
+      if (!movieId) break;
+
+      assignments.push({
+        teamId: team.id,
+        movieId: movieId,
+        winningBid: AUTO_ASSIGN_PRICE,
+      });
+      teamWinCount.set(team.id, (teamWinCount.get(team.id) || 0) + 1);
+    }
+  }
+
+  // 9. Save assignments to team_movies
   for (const assignment of assignments) {
     await supabase.from('team_movies').insert({
       team_id: assignment.teamId,
@@ -140,7 +184,7 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
     });
   }
 
-  // 9. Mark auction as resolved
+  // 10. Mark auction as resolved
   await supabase
     .from('auctions')
     .update({ status: 'resolved' })
