@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
-import { Users, Loader2, Trash2, UserX } from 'lucide-react';
+import { Users, Loader2, Trash2, UserX, X, Check } from 'lucide-react';
 
 interface Team {
   id: string;
@@ -20,6 +20,9 @@ export default function LeagueTeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [leagueId, setLeagueId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [confirmingTeamId, setConfirmingTeamId] = useState<string | null>(null);
+  const [removingTeamId, setRemovingTeamId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadTeams();
@@ -50,12 +53,21 @@ export default function LeagueTeamsPage() {
     setLoading(false);
   }
 
-  async function handleRemoveTeam(teamId: string, teamName: string) {
-    if (!confirm(`Are you sure you want to remove "${teamName}" from the league? Their movies will be returned to the pool.`)) {
+  async function handleRemoveTeam(teamId: string) {
+    setRemovingTeamId(teamId);
+    setError(null);
+
+    const { error: deleteError } = await supabase.from('teams').delete().eq('id', teamId);
+
+    if (deleteError) {
+      setError(`Failed to remove team: ${deleteError.message}`);
+      setRemovingTeamId(null);
+      setConfirmingTeamId(null);
       return;
     }
 
-    await supabase.from('teams').delete().eq('id', teamId);
+    setConfirmingTeamId(null);
+    setRemovingTeamId(null);
     loadTeams();
   }
 
@@ -73,6 +85,15 @@ export default function LeagueTeamsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Manage Teams</h1>
         <Badge variant="purple">{teams.length} teams</Badge>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       <Card>
         <CardContent className="p-0">
@@ -116,13 +137,42 @@ export default function LeagueTeamsPage() {
                       {new Date(team.created_at).toLocaleDateString()}
                     </td>
                     <td className="p-4 text-right">
-                      <button
-                        onClick={() => handleRemoveTeam(team.id, team.name)}
-                        className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                        title="Remove from league"
-                      >
-                        <UserX className="h-4 w-4" />
-                      </button>
+                      {confirmingTeamId === team.id ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <span className="text-xs text-gray-500 mr-1">Remove?</span>
+                          <button
+                            onClick={() => handleRemoveTeam(team.id)}
+                            disabled={removingTeamId === team.id}
+                            className="p-1.5 bg-red-100 text-red-600 hover:bg-red-200 rounded transition-colors disabled:opacity-50"
+                            title="Confirm remove"
+                          >
+                            {removingTeamId === team.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Check className="h-4 w-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setConfirmingTeamId(null)}
+                            disabled={removingTeamId === team.id}
+                            className="p-1.5 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded transition-colors disabled:opacity-50"
+                            title="Cancel"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setConfirmingTeamId(team.id);
+                            setError(null);
+                          }}
+                          className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                          title="Remove from league"
+                        >
+                          <UserX className="h-4 w-4" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
