@@ -21,10 +21,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get the team to find its league
+    // Get the team to find its league and user
     const { data: team, error: teamError } = await supabase
       .from('teams')
-      .select('id, league_id, name')
+      .select('id, league_id, name, user_id')
       .eq('id', teamId)
       .single();
 
@@ -56,8 +56,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use admin client to delete the team (bypasses RLS)
+    // Prevent commissioner from deleting their own team via this endpoint
+    if (team.user_id === user.id) {
+      return NextResponse.json(
+        { error: 'You cannot remove your own team' },
+        { status: 400 }
+      );
+    }
+
+    // Use admin client to delete the team and user (bypasses RLS)
     const adminSupabase = createAdminClient();
+
+    // First delete the team record
     const { error: deleteError } = await adminSupabase
       .from('teams')
       .delete()
@@ -69,6 +79,15 @@ export async function POST(request: NextRequest) {
         { error: `Failed to remove team: ${deleteError.message}` },
         { status: 500 }
       );
+    }
+
+    // Also delete the user from Supabase auth so they can sign up again with the same email
+    if (team.user_id) {
+      const { error: deleteUserError } = await adminSupabase.auth.admin.deleteUser(team.user_id);
+      if (deleteUserError) {
+        // Log but don't fail - team was already deleted
+        console.error('Error deleting user from auth:', deleteUserError);
+      }
     }
 
     return NextResponse.json({
