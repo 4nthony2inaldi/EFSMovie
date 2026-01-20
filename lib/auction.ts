@@ -15,7 +15,11 @@ interface MovieAssignment {
  * - Ties are broken by:
  *   1. Lower-ranked team wins (worse standing = wins)
  *   2. Random tiebreaker for true ties (e.g., at season start when all teams are at 0)
- * - Teams that submit no bids are auto-assigned 2 random unowned movies at $2 each
+ * - Teams that submit no bids are auto-assigned up to 2 random unowned movies
+ *   - Price per movie is the minimum of:
+ *     - League's auto_assign_max_price setting (default $20)
+ *     - League's auto_assign_budget_percent of team's budget ÷ movies assigned (default 5%)
+ *     - Amount that leaves team with enough budget for minimum bids ($1 each) on remaining movies
  */
 export async function resolveAuction(auctionId: string): Promise<MovieAssignment[]> {
   const supabase = createAdminClient();
@@ -126,10 +130,10 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
   }
 
   // 8. Auto-assign movies to teams that didn't submit any bids
-  // Get all teams in the league
+  // Get all teams in the league with their budgets
   const { data: allTeams } = await supabase
     .from('teams')
-    .select('id')
+    .select('id, budget_remaining')
     .eq('league_id', leagueId);
 
   // Find teams that submitted zero bids for this auction
@@ -147,13 +151,66 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
   // Shuffle unowned movies for random assignment
   const shuffledUnownedMovies = [...unownedMovies].sort(() => Math.random() - 0.5);
 
-  // Auto-assign 2 movies at $2 each to each team that didn't bid
-  const AUTO_ASSIGN_PRICE = 2;
+  // Get league auto-assign settings (with defaults)
+  const league = auction.league;
+  const AUTO_ASSIGN_MAX_PRICE = league?.auto_assign_max_price ?? 20;
+  const AUTO_ASSIGN_BUDGET_PERCENT = (league?.auto_assign_budget_percent ?? 5) / 100;
   const AUTO_ASSIGN_COUNT = 2;
+  const MINIMUM_BID = 1; // Minimum bid amount per movie
 
+  // Calculate remaining auctions after this one
+  const auctionMonth = auction.for_month;
+  const auctionYear = auction.for_year;
+  const seasonEndMonth = league?.season_end_month || 12;
+  const seasonEndYear = league?.season_end_year || auctionYear;
+
+  // Count remaining months (including season end month, excluding current auction month)
+  let remainingAuctions = 0;
+  let currentMonth = auctionMonth;
+  let currentYear = auctionYear;
+  while (currentYear < seasonEndYear || (currentYear === seasonEndYear && currentMonth < seasonEndMonth)) {
+    currentMonth++;
+    if (currentMonth > 12) {
+      currentMonth = 1;
+      currentYear++;
+    }
+    remainingAuctions++;
+  }
+
+  // Auto-assign movies to each team that didn't bid
   for (const team of teamsWithNoBids) {
     const currentWins = teamWinCount.get(team.id) || 0;
     const moviesToAssign = Math.min(AUTO_ASSIGN_COUNT - currentWins, shuffledUnownedMovies.length);
+
+    if (moviesToAssign <= 0) continue;
+
+    const teamBudget = parseFloat(team.budget_remaining) || 0;
+
+    // Calculate minimum reserve needed for remaining auctions
+    // Each remaining auction needs at least $1 × 2 movies = $2 to make minimum bids
+    const minimumReserve = remainingAuctions * AUTO_ASSIGN_COUNT * MINIMUM_BID;
+
+    // Calculate available budget for auto-assign (budget minus reserve)
+    const availableForAutoAssign = Math.max(0, teamBudget - minimumReserve);
+
+    // Calculate price per movie:
+    // - Combined budget percent / number of movies OR max price, whichever is less
+    // - But also limited by available budget / number of movies
+    const percentBasedPrice = (teamBudget * AUTO_ASSIGN_BUDGET_PERCENT) / moviesToAssign;
+    const budgetLimitedPrice = availableForAutoAssign / moviesToAssign;
+
+    // Take the minimum of all constraints
+    let pricePerMovie = Math.min(
+      AUTO_ASSIGN_MAX_PRICE,
+      percentBasedPrice,
+      budgetLimitedPrice
+    );
+
+    // Round to 2 decimal places
+    pricePerMovie = Math.round(pricePerMovie * 100) / 100;
+
+    // If price would be $0 or negative, still assign at $0 (free)
+    pricePerMovie = Math.max(0, pricePerMovie);
 
     for (let i = 0; i < moviesToAssign; i++) {
       const movieId = shuffledUnownedMovies.shift();
@@ -162,7 +219,7 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
       assignments.push({
         teamId: team.id,
         movieId: movieId,
-        winningBid: AUTO_ASSIGN_PRICE,
+        winningBid: pricePerMovie,
       });
       teamWinCount.set(team.id, (teamWinCount.get(team.id) || 0) + 1);
     }

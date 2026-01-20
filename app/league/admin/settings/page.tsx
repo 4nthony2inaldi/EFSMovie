@@ -15,6 +15,8 @@ interface League {
   status: string;
   join_password: string | null;
   max_teams: number;
+  auto_assign_max_price: number;
+  auto_assign_budget_percent: number;
 }
 
 export default function LeagueSettingsPage() {
@@ -35,6 +37,8 @@ export default function LeagueSettingsPage() {
   const [joinPassword, setJoinPassword] = useState('');
   const [maxTeams, setMaxTeams] = useState(12);
   const [status, setStatus] = useState('active');
+  const [autoAssignMaxPrice, setAutoAssignMaxPrice] = useState(20);
+  const [autoAssignBudgetPercent, setAutoAssignBudgetPercent] = useState(5);
 
   useEffect(() => {
     loadLeague();
@@ -60,6 +64,8 @@ export default function LeagueSettingsPage() {
       setJoinPassword(data.join_password || '');
       setMaxTeams(data.max_teams || 12);
       setStatus(data.status);
+      setAutoAssignMaxPrice(data.auto_assign_max_price ?? 20);
+      setAutoAssignBudgetPercent(data.auto_assign_budget_percent ?? 5);
     }
     setLoading(false);
   }
@@ -110,6 +116,8 @@ export default function LeagueSettingsPage() {
         join_password: joinPassword || null,
         max_teams: maxTeams,
         status,
+        auto_assign_max_price: autoAssignMaxPrice,
+        auto_assign_budget_percent: autoAssignBudgetPercent,
       })
       .eq('id', league.id);
 
@@ -289,6 +297,62 @@ export default function LeagueSettingsPage() {
                 <option value="frozen">Frozen (Scores locked)</option>
                 <option value="completed">Completed</option>
               </select>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5 text-purple-600" />
+              Auto-Assign Settings
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-gray-600">
+              When teams don&apos;t submit any bids for an auction, they are auto-assigned random unowned movies.
+              The price is the lesser of the max price or the budget percentage, but only if the team can still
+              afford minimum bids on remaining movies for the season.
+            </p>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="label">Max Auto-Assign Price ($)</label>
+                <input
+                  type="number"
+                  value={autoAssignMaxPrice}
+                  onChange={(e) => setAutoAssignMaxPrice(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className="input"
+                  min={0}
+                  step={1}
+                  required
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Maximum price per auto-assigned movie
+                </p>
+              </div>
+              <div>
+                <label className="label">Budget Percentage (%)</label>
+                <input
+                  type="number"
+                  value={autoAssignBudgetPercent}
+                  onChange={(e) => setAutoAssignBudgetPercent(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+                  className="input"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  required
+                />
+                <p className="text-sm text-gray-500 mt-1">
+                  Percentage of remaining budget (combined for all auto-assigned movies)
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+              <strong>Example:</strong> With $20 max and 5% budget, a team with $500 remaining would pay
+              min($20, $500 × 5% ÷ 2) = min($20, $12.50) = <strong>$12.50 per movie</strong>.
+              The system also ensures teams keep enough budget for minimum bids on remaining auctions.
             </div>
           </CardContent>
         </Card>
