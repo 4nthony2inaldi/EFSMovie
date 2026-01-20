@@ -57,10 +57,23 @@ export default function LeagueTeamsPage() {
     setRemovingTeamId(teamId);
     setError(null);
 
-    const { error: deleteError } = await supabase.from('teams').delete().eq('id', teamId);
+    // Use .select() to get deleted rows - RLS silently blocks deletes without error
+    const { data: deletedRows, error: deleteError } = await supabase
+      .from('teams')
+      .delete()
+      .eq('id', teamId)
+      .select();
 
     if (deleteError) {
       setError(`Failed to remove team: ${deleteError.message}`);
+      setRemovingTeamId(null);
+      setConfirmingTeamId(null);
+      return;
+    }
+
+    // Check if any rows were actually deleted
+    if (!deletedRows || deletedRows.length === 0) {
+      setError('Permission denied: Unable to remove team. You may not have commissioner access.');
       setRemovingTeamId(null);
       setConfirmingTeamId(null);
       return;
