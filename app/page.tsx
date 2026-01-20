@@ -67,13 +67,13 @@ export default async function Home() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             <FeatureCard
               icon={<Trophy className="h-8 w-8 text-gold-400" />}
-              title="Competitive Auctions"
-              description="Bid on 20-30 movies each month in silent auctions. Win your top 2 picks and build your portfolio."
+              title="Silent Auctions"
+              description="Place blind bids on movies each month. Win up to 2 movies per auction and build your roster strategically."
             />
             <FeatureCard
               icon={<TrendingUp className="h-8 w-8 text-gold-400" />}
               title="Real-Time Scoring"
-              description="Scores update daily based on box office performance, theater count, and Metacritic ratings."
+              description="Scores update based on box office performance, theater count, and Metacritic ratings."
             />
             <FeatureCard
               icon={<Star className="h-8 w-8 text-gold-400" />}
@@ -82,18 +82,18 @@ export default async function Home() {
             />
             <FeatureCard
               icon={<Users className="h-8 w-8 text-gold-400" />}
-              title="12-Team Leagues"
-              description="Compete against friends in leagues of 12 teams over a 10-month season."
+              title="Compete with Friends"
+              description="Join a league, draft movies through monthly auctions, and compete for the championship."
             />
             <FeatureCard
               icon={<Calendar className="h-8 w-8 text-gold-400" />}
-              title="10-Month Season"
-              description="From April releases through January, ending the day after the Oscars."
+              title="Season-Long Competition"
+              description="Auctions run monthly throughout the season, culminating after the Academy Awards."
             />
             <FeatureCard
               icon={<Film className="h-8 w-8 text-gold-400" />}
-              title="$1,000 Budget"
-              description="Manage your virtual budget wisely across all auctions to build the best roster."
+              title="Budget Management"
+              description="Start with a budget and manage it wisely across all auctions to build the best roster."
             />
           </div>
 

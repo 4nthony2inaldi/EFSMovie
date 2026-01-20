@@ -350,40 +350,52 @@ export default function RulesPage() {
               <AuctionStep
                 number={1}
                 title="Monthly Auctions"
-                description="Each month, new movies are added to the auction pool"
+                description="Each month, movies releasing that month are available to bid on"
               />
               <AuctionStep
                 number={2}
                 title="Blind Bidding"
-                description="Teams secretly bid on movies they want using their budget"
+                description="Teams secretly place bids on movies they want using their budget"
               />
               <AuctionStep
                 number={3}
-                title="Highest Bid Wins"
-                description="When bidding closes, highest bidder wins each movie"
+                title="Win Up to 2"
+                description="Each team can win a maximum of 2 movies per auction"
               />
             </div>
 
             <div className="bg-gray-50 rounded-xl p-5">
-              <h4 className="font-semibold text-gray-900 mb-3">Budget Rules</h4>
+              <h4 className="font-semibold text-gray-900 mb-3">Bidding Rules</h4>
               <ul className="space-y-2 text-sm text-gray-700">
-                <li className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1.5" />
-                  Each team starts with a <strong>$1,000 budget</strong> for the season
-                </li>
                 <li className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1.5" />
                   Winning bids are deducted from your remaining budget
                 </li>
                 <li className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1.5" />
-                  Tie bids are resolved by random selection
+                  Minimum bid is <strong>$1</strong> per movie
                 </li>
                 <li className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-purple-500 mt-1.5" />
-                  Minimum bid is <strong>$1</strong> per movie
+                  You can bid on as many movies as you want, but can only win 2
                 </li>
               </ul>
+            </div>
+
+            <div className="bg-amber-50 rounded-xl p-5 border border-amber-200">
+              <h4 className="font-semibold text-amber-900 mb-3">Tie-Breaking Rules</h4>
+              <p className="text-sm text-amber-800 mb-3">When two or more teams bid the same amount:</p>
+              <ol className="space-y-2 text-sm text-amber-800 list-decimal list-inside">
+                <li><strong>Lower-ranked team wins</strong> - The team in the worse standings position gets the movie (helps underdogs catch up)</li>
+                <li><strong>Random selection</strong> - If teams are tied in standings too (e.g., at season start), a random winner is chosen</li>
+              </ol>
+            </div>
+
+            <div className="bg-blue-50 rounded-xl p-5 border border-blue-200">
+              <h4 className="font-semibold text-blue-900 mb-3">Auto-Assignment</h4>
+              <p className="text-sm text-blue-800">
+                If you don&apos;t submit any bids for an auction, you&apos;ll be automatically assigned up to 2 random unowned movies at a small cost. This ensures every team stays active in the competition!
+              </p>
             </div>
           </div>
         </CardContent>
