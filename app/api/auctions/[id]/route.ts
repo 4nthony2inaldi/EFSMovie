@@ -4,11 +4,19 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
+    // Check if service role key is configured
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('SUPABASE_SERVICE_ROLE_KEY is not configured');
+      return NextResponse.json({ error: 'Server configuration error: missing service role key' }, { status: 500 });
+    }
+
     const supabase = await createClient();
-    const { id: auctionId } = await params;
+    const auctionId = params.id;
+
+    console.log('Attempting to delete auction:', auctionId);
 
     // Check if user is logged in
     const { data: { user } } = await supabase.auth.getUser();
@@ -34,83 +42,105 @@ export async function DELETE(
     }
 
     // Use admin client to bypass RLS and handle cascade delete
-    let adminSupabase;
-    try {
-      adminSupabase = createAdminClient();
-    } catch (adminError) {
-      console.error('Failed to create admin client:', adminError);
-      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
-    }
+    const adminSupabase = createAdminClient();
+
     // Get team_movies to refund budgets before deletion
-    const { data: teamMovies } = await adminSupabase
+    const { data: teamMovies, error: teamMoviesQueryError } = await adminSupabase
       .from('team_movies')
       .select('team_id, winning_bid')
       .eq('auction_id', auctionId);
 
+    if (teamMoviesQueryError) {
+      console.error('Error querying team_movies:', teamMoviesQueryError);
+      return NextResponse.json({ error: `Failed to query team movies: ${teamMoviesQueryError.message}` }, { status: 500 });
+    }
+
+    console.log('Found team_movies to refund:', teamMovies?.length || 0);
+
     // Refund budgets for any won movies
     for (const tm of teamMovies || []) {
-      const { data: team } = await adminSupabase
+      const { data: team, error: teamError } = await adminSupabase
         .from('teams')
         .select('budget_remaining')
         .eq('id', tm.team_id)
         .single();
 
+      if (teamError) {
+        console.error('Error fetching team for refund:', teamError);
+        continue;
+      }
+
       if (team) {
-        await adminSupabase
+        const { error: updateError } = await adminSupabase
           .from('teams')
           .update({ budget_remaining: Number(team.budget_remaining) + Number(tm.winning_bid) })
           .eq('id', tm.team_id);
+
+        if (updateError) {
+          console.error('Error refunding budget:', updateError);
+        }
       }
     }
 
     // Delete related records in order (foreign key constraints)
     // team_movies must be deleted first since it has a FK to auctions without cascade
+    console.log('Deleting team_movies...');
     const { error: teamMoviesError } = await adminSupabase
       .from('team_movies')
       .delete()
       .eq('auction_id', auctionId);
     if (teamMoviesError) {
-      throw new Error(`Failed to delete team movies: ${teamMoviesError.message}`);
+      console.error('Failed to delete team_movies:', teamMoviesError);
+      return NextResponse.json({ error: `Failed to delete team movies: ${teamMoviesError.message}` }, { status: 500 });
     }
 
+    console.log('Deleting bids...');
     const { error: bidsError } = await adminSupabase
       .from('bids')
       .delete()
       .eq('auction_id', auctionId);
     if (bidsError) {
-      throw new Error(`Failed to delete bids: ${bidsError.message}`);
+      console.error('Failed to delete bids:', bidsError);
+      return NextResponse.json({ error: `Failed to delete bids: ${bidsError.message}` }, { status: 500 });
     }
 
+    console.log('Deleting auction_movies...');
     const { error: auctionMoviesError } = await adminSupabase
       .from('auction_movies')
       .delete()
       .eq('auction_id', auctionId);
     if (auctionMoviesError) {
-      throw new Error(`Failed to delete auction movies: ${auctionMoviesError.message}`);
+      console.error('Failed to delete auction_movies:', auctionMoviesError);
+      return NextResponse.json({ error: `Failed to delete auction movies: ${auctionMoviesError.message}` }, { status: 500 });
     }
 
+    console.log('Deleting standings_snapshots...');
     const { error: snapshotsError } = await adminSupabase
       .from('standings_snapshots')
       .delete()
       .eq('auction_id', auctionId);
     if (snapshotsError) {
-      throw new Error(`Failed to delete standings snapshots: ${snapshotsError.message}`);
+      console.error('Failed to delete standings_snapshots:', snapshotsError);
+      return NextResponse.json({ error: `Failed to delete standings snapshots: ${snapshotsError.message}` }, { status: 500 });
     }
 
     // Finally delete the auction itself
+    console.log('Deleting auction...');
     const { error: deleteError } = await adminSupabase
       .from('auctions')
       .delete()
       .eq('id', auctionId);
     if (deleteError) {
-      throw new Error(`Failed to delete auction: ${deleteError.message}`);
+      console.error('Failed to delete auction:', deleteError);
+      return NextResponse.json({ error: `Failed to delete auction record: ${deleteError.message}` }, { status: 500 });
     }
 
+    console.log('Auction deleted successfully:', auctionId);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting auction:', error);
+    console.error('Unexpected error deleting auction:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to delete auction' },
+      { error: error instanceof Error ? error.message : 'Unexpected server error' },
       { status: 500 }
     );
   }

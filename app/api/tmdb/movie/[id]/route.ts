@@ -3,10 +3,9 @@ import { tmdb, TMDBClient } from '@/lib/tmdb';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params;
-  const movieId = parseInt(id);
+  const movieId = parseInt(params.id);
 
   if (isNaN(movieId)) {
     return NextResponse.json({ error: 'Invalid movie ID' }, { status: 400 });
