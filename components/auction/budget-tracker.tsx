@@ -24,7 +24,7 @@ export function BudgetTracker({ totalBudget, totalBids, className, compact = fal
           <span className="font-semibold">{formatCurrency(totalBudget)}</span>
         </div>
         <div className="flex items-center gap-1">
-          <span className="text-gray-500">Bids:</span>
+          <span className="text-gray-500">Top 2:</span>
           <span className="font-semibold text-purple-600">{formatCurrency(totalBids)}</span>
         </div>
         <div className="flex items-center gap-1">
@@ -74,7 +74,7 @@ export function BudgetTracker({ totalBudget, totalBids, className, compact = fal
         </div>
 
         <div className="flex justify-between">
-          <span className="text-gray-600">Total Bids</span>
+          <span className="text-gray-600">Max Spend (Top 2)</span>
           <span className="font-semibold text-purple-600">{formatCurrency(totalBids)}</span>
         </div>
 

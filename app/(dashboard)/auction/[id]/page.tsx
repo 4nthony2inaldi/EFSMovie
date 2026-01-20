@@ -278,8 +278,11 @@ export default function AuctionDetailPage({
   }
 
   const totalBids = Array.from(bids.values()).reduce((sum, b) => sum + b, 0);
-  const isOverBudget = totalBids > (team?.budget_remaining || 0);
-  const nonZeroBidCount = Array.from(bids.values()).filter((b) => b > 0).length;
+  // Calculate max spend: sum of top 2 highest bids (since you can only win 2 movies per auction)
+  const sortedBids = Array.from(bids.values()).filter((b) => b > 0).sort((a, b) => b - a);
+  const maxSpend = sortedBids.slice(0, 2).reduce((sum, b) => sum + b, 0);
+  const isOverBudget = maxSpend > (team?.budget_remaining || 0);
+  const nonZeroBidCount = sortedBids.length;
   const minRequiredBids = teamCount * 2;
   const hasEnoughBids = nonZeroBidCount >= minRequiredBids;
 
@@ -489,7 +492,7 @@ export default function AuctionDetailPage({
               />
               <BudgetTracker
                 totalBudget={team?.budget_remaining || 0}
-                totalBids={totalBids}
+                totalBids={maxSpend}
                 compact
                 className="text-white [&_span]:text-white/80 [&_.text-gray-500]:text-white/70"
               />
@@ -514,7 +517,7 @@ export default function AuctionDetailPage({
                     <div className="h-3 w-px bg-gray-300" />
                     <div className="text-gray-600">
                       Avg: <span className="font-medium text-amber-600">
-                        {formatCurrency(Math.floor(Math.max(0, (team?.budget_remaining || 0) - totalBids) / (seasonProgress.remainingMovies || 1)))}
+                        {formatCurrency(Math.floor(Math.max(0, (team?.budget_remaining || 0) - maxSpend) / (seasonProgress.remainingMovies || 1)))}
                       </span>
                     </div>
                   </>
@@ -550,7 +553,7 @@ export default function AuctionDetailPage({
                     ) : (
                       <span className="text-gray-500">
                         <span className="hidden sm:inline">{nonZeroBidCount} movie{nonZeroBidCount !== 1 ? 's' : ''} • </span>
-                        {formatCurrency(totalBids)}
+                        {formatCurrency(maxSpend)} max
                       </span>
                     )}
                   </div>
@@ -617,7 +620,7 @@ export default function AuctionDetailPage({
 
               <BudgetTracker
                 totalBudget={team?.budget_remaining || 0}
-                totalBids={totalBids}
+                totalBids={maxSpend}
               />
 
               {/* Minimum Bids Requirement */}
@@ -670,14 +673,14 @@ export default function AuctionDetailPage({
                         <div className="grid grid-cols-2 gap-3">
                           <div className="bg-green-50 rounded-lg p-3 text-center">
                             <div className="text-lg font-bold text-green-600">
-                              {formatCurrency(Math.max(0, (team?.budget_remaining || 0) - totalBids))}
+                              {formatCurrency(Math.max(0, (team?.budget_remaining || 0) - maxSpend))}
                             </div>
                             <div className="text-xs text-green-700">Max Bid</div>
                             <div className="text-xs text-green-600 opacity-75">all-in on one</div>
                           </div>
                           <div className="bg-amber-50 rounded-lg p-3 text-center">
                             <div className="text-lg font-bold text-amber-600">
-                              {formatCurrency(Math.floor(Math.max(0, (team?.budget_remaining || 0) - totalBids) / seasonProgress.remainingMovies))}
+                              {formatCurrency(Math.floor(Math.max(0, (team?.budget_remaining || 0) - maxSpend) / seasonProgress.remainingMovies))}
                             </div>
                             <div className="text-xs text-amber-700">Avg Bid</div>
                             <div className="text-xs text-amber-600 opacity-75">spread evenly</div>
