@@ -8,12 +8,40 @@ interface BudgetTrackerProps {
   totalBudget: number;
   totalBids: number;
   className?: string;
+  compact?: boolean;
 }
 
-export function BudgetTracker({ totalBudget, totalBids, className }: BudgetTrackerProps) {
+export function BudgetTracker({ totalBudget, totalBids, className, compact = false }: BudgetTrackerProps) {
   const remaining = totalBudget - totalBids;
   const isOverBudget = remaining < 0;
   const percentUsed = Math.min((totalBids / totalBudget) * 100, 100);
+
+  if (compact) {
+    return (
+      <div className={cn('flex items-center gap-3 text-xs', className)}>
+        <div className="flex items-center gap-1">
+          <span className="text-gray-500">Budget:</span>
+          <span className="font-semibold">{formatCurrency(totalBudget)}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-gray-500">Bids:</span>
+          <span className="font-semibold text-purple-600">{formatCurrency(totalBids)}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-gray-500">Left:</span>
+          <span className={cn(
+            'font-bold',
+            isOverBudget ? 'text-red-600' : 'text-green-600'
+          )}>
+            {formatCurrency(remaining)}
+          </span>
+        </div>
+        {isOverBudget && (
+          <AlertTriangle className="h-3.5 w-3.5 text-red-600" />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div

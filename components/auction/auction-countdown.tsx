@@ -7,9 +7,10 @@ import { Clock } from 'lucide-react';
 interface AuctionCountdownProps {
   targetDate: string;
   label: string;
+  compact?: boolean;
 }
 
-export function AuctionCountdown({ targetDate, label }: AuctionCountdownProps) {
+export function AuctionCountdown({ targetDate, label, compact = false }: AuctionCountdownProps) {
   const [timeRemaining, setTimeRemaining] = useState(getTimeRemaining(targetDate));
 
   useEffect(() => {
@@ -21,9 +22,25 @@ export function AuctionCountdown({ targetDate, label }: AuctionCountdownProps) {
   }, [targetDate]);
 
   if (timeRemaining.total <= 0) {
+    if (compact) {
+      return (
+        <span className="text-purple-700 font-medium text-sm">Ended</span>
+      );
+    }
     return (
       <div className="bg-purple-100 rounded-xl p-6 text-center">
         <p className="text-purple-700 font-medium">Auction has ended</p>
+      </div>
+    );
+  }
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-1.5 text-white text-sm font-medium">
+        <Clock className="h-3.5 w-3.5" />
+        <span>{timeRemaining.days}d</span>
+        <span>{timeRemaining.hours}h</span>
+        <span>{timeRemaining.minutes}m</span>
       </div>
     );
   }

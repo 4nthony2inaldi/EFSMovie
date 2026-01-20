@@ -477,169 +477,224 @@ export default function AuctionDetailPage({
       />
 
       {auction.status === 'open' && (
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Bid Form */}
-          <div className="lg:col-span-2 space-y-4">
-            {/* Submit Button */}
-            <div className="sticky top-4 z-10 bg-white/95 backdrop-blur border border-gray-200 rounded-xl p-4 shadow-lg">
-              <div className="flex items-center justify-between gap-4">
-                <div className="text-sm">
-                  {!hasEnoughBids ? (
-                    <span className="text-red-600 flex items-center gap-1.5">
-                      <AlertTriangle className="h-4 w-4" />
-                      Bid on at least {minRequiredBids} movies ({nonZeroBidCount}/{minRequiredBids})
-                    </span>
-                  ) : hasUnsavedChanges() ? (
-                    <span className="text-amber-600 flex items-center gap-1.5">
-                      <AlertTriangle className="h-4 w-4" />
-                      You have unsaved changes
-                    </span>
-                  ) : submitSuccess ? (
-                    <span className="text-green-600 flex items-center gap-1.5">
-                      <Check className="h-4 w-4" />
-                      Bids submitted successfully!
-                    </span>
-                  ) : (
-                    <span className="text-gray-500">
-                      {nonZeroBidCount} movie{nonZeroBidCount !== 1 ? 's' : ''} • {formatCurrency(totalBids)} total
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {savedBids.size > 0 && (
-                    <button
-                      onClick={unsubmitAllBids}
-                      disabled={submitting}
-                      className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="hidden sm:inline">Unsubmit All</span>
-                    </button>
-                  )}
-                  <button
-                    onClick={submitBids}
-                    disabled={submitting || isOverBudget || !hasEnoughBids || !hasUnsavedChanges()}
-                    className={cn(
-                      "flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium transition-colors",
-                      isOverBudget
-                        ? "bg-red-100 text-red-700 cursor-not-allowed"
-                        : !hasEnoughBids
-                          ? "bg-red-100 text-red-700 cursor-not-allowed"
-                          : hasUnsavedChanges()
-                            ? "bg-purple-600 text-white hover:bg-purple-700"
-                            : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                    )}
-                  >
-                    {submitting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                    {submitting ? 'Submitting...' : isOverBudget ? 'Over Budget!' : !hasEnoughBids ? `Need ${minRequiredBids - nonZeroBidCount} More` : 'Submit Bids'}
-                  </button>
-                </div>
-              </div>
+        <>
+          {/* Mobile Compact Widgets - Top of page */}
+          <div className="lg:hidden space-y-3 mb-4">
+            {/* Countdown + Budget Row */}
+            <div className="bg-gradient-to-r from-purple-600 to-purple-700 rounded-lg p-3 flex items-center justify-between">
+              <AuctionCountdown
+                targetDate={auction.closes_at}
+                label="Closes in"
+                compact
+              />
+              <BudgetTracker
+                totalBudget={team?.budget_remaining || 0}
+                totalBids={totalBids}
+                compact
+                className="text-white [&_span]:text-white/80 [&_.text-gray-500]:text-white/70"
+              />
             </div>
 
-            {movies.map((movie) => (
-              <BidRow
-                key={movie.id}
-                movie={movie}
-                bidAmount={bids.get(movie.id) || 0}
-                savedAmount={savedBids.get(movie.id) || 0}
-                maxBid={team?.budget_remaining || 0}
-                onBidChange={handleBidChange}
-                onClearBid={handleClearBid}
-              />
-            ))}
+            {/* Compact Stats Row */}
+            <div className="bg-white rounded-lg border border-gray-200 p-3 flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "flex items-center gap-1",
+                  hasEnoughBids ? "text-green-600" : "text-red-600"
+                )}>
+                  <span className="font-medium">Bids:</span>
+                  <span className="font-bold">{nonZeroBidCount}/{minRequiredBids}</span>
+                </div>
+                {seasonProgress && (
+                  <>
+                    <div className="h-3 w-px bg-gray-300" />
+                    <div className="text-gray-600">
+                      <span className="font-medium">{seasonProgress.remainingAuctions}</span> auctions left
+                    </div>
+                    <div className="h-3 w-px bg-gray-300" />
+                    <div className="text-gray-600">
+                      Avg: <span className="font-medium text-amber-600">
+                        {formatCurrency(Math.floor(Math.max(0, (team?.budget_remaining || 0) - totalBids) / (seasonProgress.remainingMovies || 1)))}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            <AuctionCountdown
-              targetDate={auction.closes_at}
-              label="Auction closes in"
-            />
-
-            <BudgetTracker
-              totalBudget={team?.budget_remaining || 0}
-              totalBids={totalBids}
-            />
-
-            {/* Minimum Bids Requirement */}
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">Minimum Bids</span>
-                  <span className={cn(
-                    "text-sm font-semibold",
-                    hasEnoughBids ? "text-green-600" : "text-red-600"
-                  )}>
-                    {nonZeroBidCount} / {minRequiredBids}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className={cn(
-                      "h-2 rounded-full transition-all",
-                      hasEnoughBids ? "bg-green-500" : "bg-red-500"
+          <div className="lg:grid lg:grid-cols-3 lg:gap-8">
+            {/* Bid Form */}
+            <div className="lg:col-span-2 space-y-3 sm:space-y-4">
+              {/* Submit Button */}
+              <div className="sticky top-2 sm:top-4 z-10 bg-white/95 backdrop-blur border border-gray-200 rounded-lg sm:rounded-xl p-2.5 sm:p-4 shadow-lg">
+                <div className="flex items-center justify-between gap-2 sm:gap-4">
+                  <div className="text-xs sm:text-sm min-w-0 flex-shrink">
+                    {!hasEnoughBids ? (
+                      <span className="text-red-600 flex items-center gap-1 sm:gap-1.5">
+                        <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span className="truncate">Need {minRequiredBids - nonZeroBidCount} more</span>
+                      </span>
+                    ) : hasUnsavedChanges() ? (
+                      <span className="text-amber-600 flex items-center gap-1 sm:gap-1.5">
+                        <AlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span className="hidden sm:inline">You have unsaved changes</span>
+                        <span className="sm:hidden">Unsaved</span>
+                      </span>
+                    ) : submitSuccess ? (
+                      <span className="text-green-600 flex items-center gap-1 sm:gap-1.5">
+                        <Check className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span className="hidden sm:inline">Bids submitted!</span>
+                        <span className="sm:hidden">Saved</span>
+                      </span>
+                    ) : (
+                      <span className="text-gray-500">
+                        <span className="hidden sm:inline">{nonZeroBidCount} movie{nonZeroBidCount !== 1 ? 's' : ''} • </span>
+                        {formatCurrency(totalBids)}
+                      </span>
                     )}
-                    style={{ width: `${Math.min(100, (nonZeroBidCount / minRequiredBids) * 100)}%` }}
-                  />
+                  </div>
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                    {savedBids.size > 0 && (
+                      <button
+                        onClick={unsubmitAllBids}
+                        disabled={submitting}
+                        className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-lg font-medium transition-colors border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 text-xs sm:text-sm"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span className="hidden sm:inline">Unsubmit All</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={submitBids}
+                      disabled={submitting || isOverBudget || !hasEnoughBids || !hasUnsavedChanges()}
+                      className={cn(
+                        "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2 sm:py-2.5 rounded-lg font-medium transition-colors text-xs sm:text-sm",
+                        isOverBudget
+                          ? "bg-red-100 text-red-700 cursor-not-allowed"
+                          : !hasEnoughBids
+                            ? "bg-red-100 text-red-700 cursor-not-allowed"
+                            : hasUnsavedChanges()
+                              ? "bg-purple-600 text-white hover:bg-purple-700"
+                              : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                      )}
+                    >
+                      {submitting ? (
+                        <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      )}
+                      <span className="hidden sm:inline">
+                        {submitting ? 'Submitting...' : isOverBudget ? 'Over Budget!' : !hasEnoughBids ? `Need ${minRequiredBids - nonZeroBidCount} More` : 'Submit Bids'}
+                      </span>
+                      <span className="sm:hidden">
+                        {submitting ? '...' : isOverBudget ? 'Over!' : 'Submit'}
+                      </span>
+                    </button>
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  You must bid on at least {minRequiredBids} movies ({teamCount} teams x 2)
-                </p>
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* Season Progress */}
-            {seasonProgress && seasonEndMonth && seasonEndYear && (
+              {movies.map((movie) => (
+                <BidRow
+                  key={movie.id}
+                  movie={movie}
+                  bidAmount={bids.get(movie.id) || 0}
+                  savedAmount={savedBids.get(movie.id) || 0}
+                  maxBid={team?.budget_remaining || 0}
+                  onBidChange={handleBidChange}
+                  onClearBid={handleClearBid}
+                />
+              ))}
+            </div>
+
+            {/* Sidebar - Desktop Only */}
+            <div className="hidden lg:block space-y-6">
+              <AuctionCountdown
+                targetDate={auction.closes_at}
+                label="Auction closes in"
+              />
+
+              <BudgetTracker
+                totalBudget={team?.budget_remaining || 0}
+                totalBids={totalBids}
+              />
+
+              {/* Minimum Bids Requirement */}
               <Card>
                 <CardContent className="p-4">
-                  <div className="text-sm font-medium text-gray-700 mb-3">Season Progress</div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-purple-50 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-purple-600">{seasonProgress.remainingAuctions}</div>
-                      <div className="text-xs text-purple-700">Auctions Left</div>
-                    </div>
-                    <div className="bg-blue-50 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-blue-600">{seasonProgress.remainingMovies}</div>
-                      <div className="text-xs text-blue-700">Movies to Pick</div>
-                    </div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-700">Minimum Bids</span>
+                    <span className={cn(
+                      "text-sm font-semibold",
+                      hasEnoughBids ? "text-green-600" : "text-red-600"
+                    )}>
+                      {nonZeroBidCount} / {minRequiredBids}
+                    </span>
                   </div>
-
-                  {/* Budget Strategy Helper */}
-                  {seasonProgress.remainingMovies > 0 && (
-                    <div className="mt-4 pt-4 border-t border-gray-200">
-                      <div className="text-xs font-medium text-gray-600 mb-2">Budget Strategy</div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-green-50 rounded-lg p-3 text-center">
-                          <div className="text-lg font-bold text-green-600">
-                            {formatCurrency(Math.max(0, (team?.budget_remaining || 0) - totalBids))}
-                          </div>
-                          <div className="text-xs text-green-700">Max Bid</div>
-                          <div className="text-xs text-green-600 opacity-75">all-in on one</div>
-                        </div>
-                        <div className="bg-amber-50 rounded-lg p-3 text-center">
-                          <div className="text-lg font-bold text-amber-600">
-                            {formatCurrency(Math.floor(Math.max(0, (team?.budget_remaining || 0) - totalBids) / seasonProgress.remainingMovies))}
-                          </div>
-                          <div className="text-xs text-amber-700">Avg Bid</div>
-                          <div className="text-xs text-amber-600 opacity-75">spread evenly</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <p className="text-xs text-gray-500 mt-3">
-                    Season ends {MONTH_NAMES[seasonEndMonth]} {seasonEndYear}
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={cn(
+                        "h-2 rounded-full transition-all",
+                        hasEnoughBids ? "bg-green-500" : "bg-red-500"
+                      )}
+                      style={{ width: `${Math.min(100, (nonZeroBidCount / minRequiredBids) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    You must bid on at least {minRequiredBids} movies ({teamCount} teams x 2)
                   </p>
                 </CardContent>
               </Card>
-            )}
+
+              {/* Season Progress */}
+              {seasonProgress && seasonEndMonth && seasonEndYear && (
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-sm font-medium text-gray-700 mb-3">Season Progress</div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-purple-50 rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold text-purple-600">{seasonProgress.remainingAuctions}</div>
+                        <div className="text-xs text-purple-700">Auctions Left</div>
+                      </div>
+                      <div className="bg-blue-50 rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold text-blue-600">{seasonProgress.remainingMovies}</div>
+                        <div className="text-xs text-blue-700">Movies to Pick</div>
+                      </div>
+                    </div>
+
+                    {/* Budget Strategy Helper */}
+                    {seasonProgress.remainingMovies > 0 && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <div className="text-xs font-medium text-gray-600 mb-2">Budget Strategy</div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-green-50 rounded-lg p-3 text-center">
+                            <div className="text-lg font-bold text-green-600">
+                              {formatCurrency(Math.max(0, (team?.budget_remaining || 0) - totalBids))}
+                            </div>
+                            <div className="text-xs text-green-700">Max Bid</div>
+                            <div className="text-xs text-green-600 opacity-75">all-in on one</div>
+                          </div>
+                          <div className="bg-amber-50 rounded-lg p-3 text-center">
+                            <div className="text-lg font-bold text-amber-600">
+                              {formatCurrency(Math.floor(Math.max(0, (team?.budget_remaining || 0) - totalBids) / seasonProgress.remainingMovies))}
+                            </div>
+                            <div className="text-xs text-amber-700">Avg Bid</div>
+                            <div className="text-xs text-amber-600 opacity-75">spread evenly</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <p className="text-xs text-gray-500 mt-3">
+                      Season ends {MONTH_NAMES[seasonEndMonth]} {seasonEndYear}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {auction.status === 'upcoming' && (
