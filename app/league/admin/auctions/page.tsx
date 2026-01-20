@@ -164,16 +164,26 @@ export default function LeagueAuctionsPage() {
       const response = await fetch(`/api/auctions/${id}`, {
         method: 'DELETE',
       });
-      const data = await response.json();
+
+      const text = await response.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        console.error('Non-JSON response:', text);
+        alert(`Failed to delete: Server returned invalid response (${response.status})`);
+        return;
+      }
 
       if (!response.ok) {
-        alert(`Failed to delete: ${data.error}`);
+        alert(`Failed to delete: ${data.error || 'Unknown error'}`);
         return;
       }
 
       loadData();
     } catch (error) {
-      alert('Failed to delete auction');
+      console.error('Delete error:', error);
+      alert(`Failed to delete auction: ${error instanceof Error ? error.message : 'Network error'}`);
     }
   }
 

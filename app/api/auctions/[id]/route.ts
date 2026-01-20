@@ -6,35 +6,41 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const supabase = await createClient();
-  const { id: auctionId } = await params;
-
-  // Check if user is logged in
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Check if user is the commissioner of the league that owns this auction
-  const { data: auction, error: auctionError } = await supabase
-    .from('auctions')
-    .select('id, league:leagues!inner(id, commissioner_user_id)')
-    .eq('id', auctionId)
-    .single();
-
-  if (auctionError || !auction) {
-    return NextResponse.json({ error: 'Auction not found' }, { status: 404 });
-  }
-
-  const league = auction.league as unknown as { id: string; commissioner_user_id: string };
-  if (league.commissioner_user_id !== user.id) {
-    return NextResponse.json({ error: 'Only the commissioner can delete auctions' }, { status: 403 });
-  }
-
-  // Use admin client to bypass RLS and handle cascade delete
-  const adminSupabase = createAdminClient();
-
   try {
+    const supabase = await createClient();
+    const { id: auctionId } = await params;
+
+    // Check if user is logged in
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check if user is the commissioner of the league that owns this auction
+    const { data: auction, error: auctionError } = await supabase
+      .from('auctions')
+      .select('id, league:leagues!inner(id, commissioner_user_id)')
+      .eq('id', auctionId)
+      .single();
+
+    if (auctionError || !auction) {
+      console.error('Auction lookup error:', auctionError);
+      return NextResponse.json({ error: 'Auction not found' }, { status: 404 });
+    }
+
+    const league = auction.league as unknown as { id: string; commissioner_user_id: string };
+    if (league.commissioner_user_id !== user.id) {
+      return NextResponse.json({ error: 'Only the commissioner can delete auctions' }, { status: 403 });
+    }
+
+    // Use admin client to bypass RLS and handle cascade delete
+    let adminSupabase;
+    try {
+      adminSupabase = createAdminClient();
+    } catch (adminError) {
+      console.error('Failed to create admin client:', adminError);
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
     // Get team_movies to refund budgets before deletion
     const { data: teamMovies } = await adminSupabase
       .from('team_movies')
