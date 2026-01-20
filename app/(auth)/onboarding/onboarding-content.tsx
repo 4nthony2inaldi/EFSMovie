@@ -80,11 +80,13 @@ export function OnboardingContent() {
 
     try {
       // Create the league with this user as commissioner
+      const currentYear = new Date().getFullYear();
       const { data: league, error: leagueError } = await supabase
         .from('leagues')
         .insert({
           name: leagueName.trim(),
-          season_year: new Date().getFullYear(),
+          season_year: currentYear,
+          season_end_year: currentYear,
           commissioner_user_id: userId,
           join_password: leaguePassword || null,
         })
