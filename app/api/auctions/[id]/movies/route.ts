@@ -4,9 +4,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const auctionId = params.id;
+  const { id: auctionId } = await params;
 
   try {
     const body = await request.json();
@@ -102,9 +102,9 @@ export async function PUT(
 // GET endpoint to fetch auction movies
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const auctionId = params.id;
+  const { id: auctionId } = await params;
 
   try {
     const supabase = await createClient();
