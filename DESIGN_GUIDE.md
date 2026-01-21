@@ -2,23 +2,30 @@
 
 A comprehensive design methodology guide for maintaining visual consistency across the application. Use this document when building new features or working in other Claude Code sessions.
 
+**CRITICAL: This guide defines a premium, spacious design language. Do NOT default to compact, cramped, or purely functional layouts. Every page should feel polished and breathable.**
+
 ---
 
 ## Table of Contents
 
 1. [Core Philosophy](#core-philosophy)
-2. [Technology Stack](#technology-stack)
-3. [Color System](#color-system)
-4. [Typography](#typography)
-5. [Spacing & Layout](#spacing--layout)
-6. [Responsive Design](#responsive-design)
-7. [Component Patterns](#component-patterns)
-8. [Icons](#icons)
-9. [Forms & Inputs](#forms--inputs)
-10. [Buttons](#buttons)
-11. [Cards & Containers](#cards--containers)
-12. [Animations & Transitions](#animations--transitions)
-13. [Code Examples](#code-examples)
+2. [Layout Architecture](#layout-architecture) ⭐ **READ THIS FIRST**
+3. [Visual Hierarchy & Whitespace](#visual-hierarchy--whitespace) ⭐ **CRITICAL**
+4. [Anti-Patterns](#anti-patterns) ⭐ **WHAT NOT TO DO**
+5. [UX Principles](#ux-principles)
+6. [Technology Stack](#technology-stack)
+7. [Color System](#color-system)
+8. [Typography](#typography)
+9. [Spacing & Layout](#spacing--layout)
+10. [Responsive Design](#responsive-design)
+11. [Component Patterns](#component-patterns)
+12. [Dashboard & Stats Patterns](#dashboard--stats-patterns)
+13. [Icons](#icons)
+14. [Forms & Inputs](#forms--inputs)
+15. [Buttons](#buttons)
+16. [Cards & Containers](#cards--containers)
+17. [Animations & Transitions](#animations--transitions)
+18. [Code Examples](#code-examples)
 
 ---
 
@@ -35,6 +42,450 @@ A comprehensive design methodology guide for maintaining visual consistency acro
 ### No Dark Mode
 
 This application is light-mode only. Do not add dark mode variants.
+
+---
+
+## Layout Architecture
+
+**⚠️ CRITICAL SECTION - Read this before building any page**
+
+This design system prioritizes **spacious, centered, premium-feeling layouts**. The goal is to make users feel like they're using a polished product, not a developer's quick prototype.
+
+### The Golden Rules
+
+1. **NEVER left-justify everything** - Content should be centered or have intentional asymmetry
+2. **ALWAYS use max-width constraints** - Content should not stretch to fill the entire viewport
+3. **GENEROUS padding everywhere** - When in doubt, add more padding
+4. **Cards should breathe** - Internal padding of p-6 minimum, often p-8
+5. **Grid gaps matter** - Use gap-6 or gap-8, not gap-2 or gap-4 for card grids
+
+### Page Layout Structure
+
+Every page should follow this structure:
+
+```tsx
+// CORRECT: Centered content with max-width constraints
+<div className="p-6 sm:p-8 lg:p-10">
+  <div className="max-w-7xl mx-auto">
+    {/* Page header */}
+    <div className="mb-8">
+      <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Page Title</h1>
+      <p className="text-gray-600 mt-2">Optional description with breathing room</p>
+    </div>
+
+    {/* Content with generous spacing */}
+    <div className="space-y-8">
+      {/* Sections go here */}
+    </div>
+  </div>
+</div>
+
+// WRONG: Left-aligned, cramped, no constraints
+<div className="p-4">
+  <h1>Page Title</h1>
+  <div className="space-y-2">
+    {/* Cramped content */}
+  </div>
+</div>
+```
+
+### Content Width Guidelines
+
+| Content Type | Max Width | Class |
+|-------------|-----------|-------|
+| Full page content | 1280px | `max-w-7xl mx-auto` |
+| Reading content/forms | 672px | `max-w-2xl mx-auto` |
+| Narrow forms/modals | 448px | `max-w-md mx-auto` |
+| Wide dashboards | 1536px | `max-w-screen-2xl mx-auto` |
+
+### Main Content Area (with sidebar)
+
+```tsx
+<main className="lg:ml-64 min-h-screen bg-gray-50">
+  <div className="p-6 sm:p-8 lg:p-10 pt-20 lg:pt-10">
+    <div className="max-w-7xl mx-auto">
+      {children}
+    </div>
+  </div>
+</main>
+```
+
+### Section Spacing
+
+```tsx
+// Between major sections: mb-10 or mb-12
+<section className="mb-10">
+  <h2 className="text-xl font-semibold mb-6">Section Title</h2>
+  {/* content */}
+</section>
+
+// Between related items: mb-6 or mb-8
+<div className="mb-8">
+  {/* related content group */}
+</div>
+```
+
+---
+
+## Visual Hierarchy & Whitespace
+
+**The #1 mistake is not using enough whitespace.** Premium applications feel spacious. Cramped layouts feel like internal tools or MVPs.
+
+### Whitespace Philosophy
+
+1. **Whitespace is not wasted space** - It creates focus, improves readability, and signals quality
+2. **Double your first instinct** - If you think p-4 is enough, try p-6 or p-8
+3. **Let important elements breathe** - Hero sections, CTAs, and key stats need extra space
+4. **Create visual rhythm** - Consistent spacing creates a professional feel
+
+### Minimum Spacing Rules
+
+| Context | Minimum Padding | Recommended |
+|---------|-----------------|-------------|
+| Page outer padding | p-4 | p-6 sm:p-8 lg:p-10 |
+| Card internal padding | p-4 | p-6 |
+| Stat card padding | p-4 | p-6 |
+| Form sections | p-4 | p-6 |
+| Between cards | gap-4 | gap-6 |
+| Section margins | mb-6 | mb-8 or mb-10 |
+| Header to content | mb-4 | mb-6 or mb-8 |
+
+### Creating Visual Hierarchy
+
+```tsx
+// Level 1: Page Header (largest, most prominent)
+<div className="mb-10">
+  <h1 className="text-3xl font-bold text-gray-900 mb-3">Dashboard</h1>
+  <p className="text-lg text-gray-600">Welcome back, here's your overview</p>
+</div>
+
+// Level 2: Section Headers
+<div className="mb-6">
+  <h2 className="text-xl font-semibold text-gray-900">Recent Activity</h2>
+</div>
+
+// Level 3: Card Headers
+<div className="mb-4">
+  <h3 className="text-lg font-medium text-gray-900">Card Title</h3>
+</div>
+
+// Level 4: Labels and metadata
+<span className="text-sm text-gray-500">Last updated 2 hours ago</span>
+```
+
+### The Breathing Room Test
+
+Before shipping any page, ask:
+- Does the content feel cramped?
+- Is there clear visual separation between sections?
+- Do the cards have enough internal padding?
+- Is there enough space between the header and first content block?
+- Would a user feel like this is a premium product?
+
+---
+
+## Anti-Patterns
+
+**⛔ These patterns are FORBIDDEN in this design system**
+
+### Layout Anti-Patterns
+
+```tsx
+// ❌ WRONG: No max-width, content stretches across entire screen
+<div className="p-4">
+  <div className="grid grid-cols-4 gap-2">
+
+// ✅ CORRECT: Constrained width, centered, generous spacing
+<div className="p-6 sm:p-8">
+  <div className="max-w-7xl mx-auto">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+```
+
+```tsx
+// ❌ WRONG: Minimal padding, cramped cards
+<div className="card p-2">
+  <span className="text-sm">Small Card</span>
+</div>
+
+// ✅ CORRECT: Generous padding, proper hierarchy
+<div className="card p-6">
+  <h3 className="text-lg font-semibold mb-2">Card Title</h3>
+  <p className="text-gray-600">Card content with room to breathe</p>
+</div>
+```
+
+```tsx
+// ❌ WRONG: Left-aligned stats in a row with no visual appeal
+<div className="flex gap-2">
+  <div>Stat: 5</div>
+  <div>Stat: 10</div>
+</div>
+
+// ✅ CORRECT: Centered grid with visual cards
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+  <div className="card p-6 text-center">
+    <p className="text-sm text-gray-500 mb-1">Stat Label</p>
+    <p className="text-3xl font-bold text-purple-600">5</p>
+  </div>
+</div>
+```
+
+### Typography Anti-Patterns
+
+```tsx
+// ❌ WRONG: No hierarchy, everything same size
+<div>
+  <span>Title</span>
+  <span>Description</span>
+  <span>Metadata</span>
+</div>
+
+// ✅ CORRECT: Clear visual hierarchy
+<div>
+  <h2 className="text-xl font-semibold text-gray-900">Title</h2>
+  <p className="text-gray-600 mt-2">Description with secondary styling</p>
+  <span className="text-sm text-gray-500 mt-1">Metadata in smallest size</span>
+</div>
+```
+
+### Spacing Anti-Patterns
+
+```tsx
+// ❌ WRONG: Tight spacing, feels cramped
+<div className="space-y-1">
+<div className="gap-2">
+<div className="p-2">
+<div className="mb-2">
+
+// ✅ CORRECT: Generous spacing, feels premium
+<div className="space-y-4"> or space-y-6
+<div className="gap-4"> or gap-6
+<div className="p-4"> or p-6
+<div className="mb-6"> or mb-8
+```
+
+### Component Anti-Patterns
+
+```tsx
+// ❌ WRONG: Plain, unstyled stats
+<span>10</span>
+
+// ✅ CORRECT: Styled stat with context
+<div className="text-center">
+  <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Total</p>
+  <p className="text-3xl font-bold text-gray-900 mt-1">10</p>
+</div>
+```
+
+### Things to NEVER Do
+
+1. **NEVER** use gap-1 or gap-2 for card grids
+2. **NEVER** use p-2 for card padding (minimum p-4, prefer p-6)
+3. **NEVER** skip max-width constraints on page content
+4. **NEVER** left-align everything without intentional design
+5. **NEVER** use raw numbers without visual context (labels, units, icons)
+6. **NEVER** stack elements with space-y-1 or space-y-2
+7. **NEVER** make stat cards smaller than 120px wide
+8. **NEVER** forget responsive sizing (always include sm:, md:, lg: variants)
+
+---
+
+## UX Principles
+
+### User Experience Guidelines
+
+1. **Clarity over density** - Users shouldn't have to squint or parse cramped information
+2. **Scannability** - Key information should be immediately visible
+3. **Visual affordances** - Interactive elements should look interactive
+4. **Consistent patterns** - Similar actions should look and work similarly
+5. **Feedback** - Users should always know what's happening
+
+### Dashboard UX Patterns
+
+```tsx
+// Top-level stats should be immediately visible and impressive
+<div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+  <StatCard
+    label="Total Items"
+    value={42}
+    icon={Box}
+    trend="+12%"
+  />
+  {/* ... more stat cards */}
+</div>
+
+// Recent activity should show context and be scannable
+<div className="card">
+  <div className="px-6 py-4 border-b border-gray-100">
+    <h2 className="text-lg font-semibold">Recent Activity</h2>
+  </div>
+  <div className="divide-y divide-gray-100">
+    {items.map(item => (
+      <div key={item.id} className="px-6 py-4 flex items-center justify-between">
+        {/* Item with icon, title, description, and timestamp */}
+      </div>
+    ))}
+  </div>
+</div>
+```
+
+### Empty States
+
+Empty states should never be just text. They should:
+- Have a relevant icon (h-12 w-12 minimum)
+- Have a clear title
+- Have helpful description text
+- Include a call-to-action when appropriate
+
+```tsx
+<div className="card p-12 text-center">
+  <Film className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+  <h3 className="text-lg font-semibold text-gray-900 mb-2">No movies yet</h3>
+  <p className="text-gray-600 mb-6 max-w-sm mx-auto">
+    Start building your collection by adding your first movie.
+  </p>
+  <button className="btn-primary">Add Movie</button>
+</div>
+```
+
+### Loading States
+
+Loading states should maintain layout structure:
+
+```tsx
+// Skeleton cards that match real content dimensions
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+  {[1, 2, 3, 4].map(i => (
+    <div key={i} className="card p-6 animate-pulse">
+      <div className="h-4 bg-gray-200 rounded w-1/2 mb-4" />
+      <div className="h-8 bg-gray-200 rounded w-3/4" />
+    </div>
+  ))}
+</div>
+```
+
+---
+
+## Dashboard & Stats Patterns
+
+**Dashboards are the first impression. They must feel polished and informative.**
+
+### Stat Card Component
+
+```tsx
+interface StatCardProps {
+  label: string
+  value: string | number
+  icon?: LucideIcon
+  trend?: string
+  trendUp?: boolean
+  color?: 'purple' | 'gold' | 'green' | 'blue'
+}
+
+function StatCard({ label, value, icon: Icon, trend, trendUp, color = 'purple' }: StatCardProps) {
+  const colorClasses = {
+    purple: 'bg-purple-50 text-purple-600 border-purple-100',
+    gold: 'bg-gold-50 text-gold-600 border-gold-100',
+    green: 'bg-green-50 text-green-600 border-green-100',
+    blue: 'bg-blue-50 text-blue-600 border-blue-100',
+  }
+
+  return (
+    <div className={`card p-6 ${colorClasses[color]}`}>
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-sm font-medium text-gray-600 uppercase tracking-wide">
+          {label}
+        </span>
+        {Icon && <Icon className="h-5 w-5 opacity-60" />}
+      </div>
+      <div className="flex items-end justify-between">
+        <span className="text-3xl font-bold text-gray-900">{value}</span>
+        {trend && (
+          <span className={`text-sm font-medium ${trendUp ? 'text-green-600' : 'text-red-600'}`}>
+            {trend}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+```
+
+### Stats Row Layout
+
+```tsx
+// ALWAYS use responsive grid, NEVER flex with wrap for stats
+<div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+  <StatCard label="Total Users" value={1234} icon={Users} color="purple" />
+  <StatCard label="Revenue" value="$12.5k" icon={DollarSign} color="green" />
+  <StatCard label="Orders" value={89} icon={ShoppingBag} color="gold" />
+  <StatCard label="Conversion" value="3.2%" icon={TrendingUp} color="blue" />
+</div>
+```
+
+### Featured/Hero Stats
+
+For the most important stat on a page:
+
+```tsx
+<div className="card bg-gradient-to-br from-purple-600 to-purple-800 p-8 text-white mb-8">
+  <div className="flex items-center justify-between">
+    <div>
+      <p className="text-purple-200 text-sm font-medium uppercase tracking-wide mb-2">
+        Total Points
+      </p>
+      <p className="text-5xl font-bold mb-2">2,847</p>
+      <p className="text-purple-200">
+        You're ranked #3 in the league
+      </p>
+    </div>
+    <Trophy className="h-16 w-16 text-purple-300" />
+  </div>
+</div>
+```
+
+### Dashboard Page Template
+
+```tsx
+export default function DashboardPage() {
+  return (
+    <div className="space-y-8">
+      {/* Page Header */}
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-gray-600 mt-2">Welcome back! Here's your overview.</p>
+      </div>
+
+      {/* Featured Hero Stat (optional) */}
+      <div className="card bg-gradient-to-br from-purple-600 to-purple-800 p-8 text-white">
+        {/* Hero content */}
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Stat cards */}
+      </div>
+
+      {/* Main Content Area */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Primary content (2 cols) */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="card">
+            {/* Main content */}
+          </div>
+        </div>
+
+        {/* Sidebar content (1 col) */}
+        <div className="space-y-6">
+          <div className="card">
+            {/* Secondary content */}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+```
 
 ---
 
