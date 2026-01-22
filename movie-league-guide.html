@@ -43,8 +43,9 @@
     .overview-text h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
     .overview-text p { font-size: 0.85rem; color: #c4b5fd; line-height: 1.4; }
 
-    /* Main Grid */
-    .main-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 14px; }
+    /* Main Grid - using flexbox for PDF compatibility */
+    .main-grid { display: flex; gap: 14px; margin-bottom: 14px; }
+    .main-grid > .card { flex: 1; min-width: 0; }
 
     /* Cards */
     .card {
@@ -168,13 +169,13 @@
     .formula-value { color: #fef3c7; }
     .formula-plus { color: #4ade80; }
 
-    /* Stats Row */
+    /* Stats Row - using flexbox for PDF compatibility */
     .stats-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      display: flex;
       gap: 8px;
       margin-top: 10px;
     }
+    .stats-row > .stat-item { flex: 1; }
     .stat-item {
       background: rgba(0, 0, 0, 0.2);
       border-radius: 6px;
@@ -184,19 +185,16 @@
     .stat-value { font-size: 1.1rem; font-weight: 800; color: #fff; }
     .stat-label { font-size: 0.65rem; color: #94a3b8; text-transform: uppercase; margin-top: 2px; }
 
-    /* Two Column Section */
-    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
-
-    /* Scoring Card - Wide */
-    .scoring-wide {
-      grid-column: span 2;
-    }
+    /* Two Column Section - using flexbox for PDF compatibility */
+    .two-col { display: flex; gap: 14px; margin-bottom: 14px; }
+    .two-col > .card { flex: 1; min-width: 0; }
+    .two-col > .card.scoring-wide { flex: 2; }
     .scoring-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      display: flex;
       gap: 10px;
       margin-top: 10px;
     }
+    .scoring-grid > .scoring-box { flex: 1; }
     .scoring-box {
       background: rgba(0, 0, 0, 0.2);
       border-radius: 8px;
@@ -222,10 +220,10 @@
       margin-top: 10px;
     }
     .examples-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
+      display: flex;
       gap: 10px;
     }
+    .examples-grid > .example-box { flex: 1; }
     .example-box {
       background: rgba(255, 255, 255, 0.05);
       border-radius: 6px;
@@ -264,10 +262,10 @@
     .quick-ref-header span:first-child { font-size: 1.1rem; }
     .quick-ref-header span:last-child { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; }
     .quick-ref-grid {
-      display: grid;
-      grid-template-columns: repeat(8, 1fr);
+      display: flex;
       gap: 8px;
     }
+    .quick-ref-grid > .ref-item { flex: 1; }
     .ref-item {
       background: rgba(0, 0, 0, 0.25);
       border-radius: 8px;
@@ -355,28 +353,8 @@
     </div>
   </div>
 
-  <!-- Main 3-Column Grid -->
+  <!-- Main 3-Column Grid: Budget → Bidding → Tie-Breaker -->
   <div class="main-grid">
-    <!-- Bidding System -->
-    <div class="card">
-      <div class="card-header">
-        <div class="card-icon icon-green">💰</div>
-        <span class="card-title">Bidding System</span>
-      </div>
-      <div class="card-content green-bullets">
-        <ul>
-          <li><span class="highlight">Minimum bid: $1</span> per movie</li>
-          <li>Win up to <span class="highlight">2 movies</span> per auction</li>
-          <li><span class="highlight">Highest bid wins</span> the movie</li>
-          <li>Set <span class="highlight">priorities</span> if you might win 3+</li>
-          <li>Bids are <span class="highlight">blind</span> — you can't see others</li>
-        </ul>
-        <div class="tip-note">
-          <strong>Pro Tip:</strong> Use "$1 on All" to quickly bid minimum on everything!
-        </div>
-      </div>
-    </div>
-
     <!-- Budget Management -->
     <div class="card">
       <div class="card-header">
@@ -403,6 +381,26 @@
             <div class="stat-value">2</div>
             <div class="stat-label">Max Wins</div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bidding System -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon icon-green">💰</div>
+        <span class="card-title">Bidding System</span>
+      </div>
+      <div class="card-content green-bullets">
+        <ul>
+          <li><span class="highlight">Minimum bid: $1</span> per movie</li>
+          <li>Win up to <span class="highlight">2 movies</span> per auction</li>
+          <li><span class="highlight">Highest bid wins</span> the movie</li>
+          <li>Set <span class="highlight">priorities</span> if you might win 3+</li>
+          <li>Bids are <span class="highlight">blind</span> — you can't see others</li>
+        </ul>
+        <div class="tip-note">
+          <strong>Pro Tip:</strong> Use "$1 on All" to quickly bid minimum on everything!
         </div>
       </div>
     </div>
