@@ -336,6 +336,25 @@ export default function AuctionDetailPage({
     setSubmitSuccess(false);
   };
 
+  // Bid $1 on all movies that don't have a bid
+  const bidOneDollarOnAll = () => {
+    setBids((prev) => {
+      const next = new Map(prev);
+      movies.forEach((movie) => {
+        if (!next.has(movie.id) || next.get(movie.id) === 0) {
+          next.set(movie.id, 1);
+        }
+      });
+      return next;
+    });
+    setSubmitSuccess(false);
+  };
+
+  // Count movies without bids (for button text)
+  const moviesWithoutBids = movies.filter(
+    (movie) => !bids.has(movie.id) || bids.get(movie.id) === 0
+  ).length;
+
   if (loading || !auction) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -643,6 +662,20 @@ export default function AuctionDetailPage({
                         </Badge>
                       )}
                     </button>
+                    {moviesWithoutBids > 0 && (
+                      <button
+                        onClick={bidOneDollarOnAll}
+                        className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-lg font-medium transition-colors border border-green-200 text-green-600 hover:bg-green-50 text-xs sm:text-sm"
+                        title={`Place $1 bid on all ${moviesWithoutBids} movies without bids`}
+                      >
+                        <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span className="hidden sm:inline">$1 on All</span>
+                        <span className="sm:hidden">$1</span>
+                        <Badge variant="green" className="ml-1 text-xs">
+                          {moviesWithoutBids}
+                        </Badge>
+                      </button>
+                    )}
                     {savedBids.size > 0 && (
                       <button
                         onClick={unsubmitAllBids}
