@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Movie League Guide</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: #ffffff;
+      padding: 8px 12px;
+    }
+    .header { text-align: center; margin-bottom: 8px; }
+    .header h1 { font-size: 1.4rem; font-weight: 800; color: #f5af19; margin-bottom: 1px; }
+    .header p { color: #94a3b8; font-size: 0.55rem; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .card {
+      background: rgba(255, 255, 255, 0.07);
+      border-radius: 6px;
+      padding: 6px 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 4px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding-bottom: 3px;
+    }
+    .card-icon { font-size: 0.7rem; }
+    .card-title { font-size: 0.55rem; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.3px; }
+    .card-content { font-size: 0.45rem; line-height: 1.35; color: #cbd5e1; }
+    .card-content ul { list-style: none; }
+    .card-content li { position: relative; padding-left: 8px; margin-bottom: 2px; }
+    .card-content li::before { content: "•"; position: absolute; left: 0; font-weight: bold; }
+    .auction li::before { color: #667eea; }
+    .bidding li::before { color: #38ef7d; }
+    .scoring li::before { color: #f5af19; }
+    .budget li::before { color: #00c9ff; }
+    .tiebreak li::before { color: #fc466b; }
+    .tips li::before { color: #f093fb; }
+    .highlight { color: #fff; font-weight: 600; }
+    .formula-box {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 3px;
+      padding: 3px 5px;
+      margin: 3px 0;
+      font-family: monospace;
+      font-size: 0.4rem;
+      border-left: 2px solid #f5af19;
+    }
+    .quick-ref {
+      grid-column: span 4;
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
+      border: 1px solid rgba(102, 126, 234, 0.2);
+    }
+    .quick-ref-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 4px; }
+    .stat-box { text-align: center; background: rgba(0, 0, 0, 0.2); border-radius: 4px; padding: 4px 2px; }
+    .stat-value { font-size: 0.7rem; font-weight: 800; color: #fff; }
+    .stat-label { font-size: 0.35rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.2px; }
+    .tip-note { margin-top: 2px; font-size: 0.4rem; color: #f5af19; font-style: italic; }
+    .footer { text-align: center; margin-top: 6px; color: #64748b; font-size: 0.4rem; }
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Movie League Guide</h1>
+    <p>Your complete guide to auctions, bidding, and scoring</p>
+  </div>
+
+  <div class="grid">
+    <div class="card auction">
+      <div class="card-header">
+        <span class="card-icon">🎬</span>
+        <span class="card-title">How Auctions Work</span>
+      </div>
+      <div class="card-content">
+        <ul>
+          <li><span class="highlight">Opens</span> - Browse movies, place bids</li>
+          <li><span class="highlight">Bidding</span> - Modify bids anytime while open</li>
+          <li><span class="highlight">Closes</span> - No more changes allowed</li>
+          <li><span class="highlight">Resolves</span> - Winners assigned automatically</li>
+        </ul>
+        <div class="tip-note">You can add up to 2 movies per auction from TMDB!</div>
+      </div>
+    </div>
+
+    <div class="card bidding">
+      <div class="card-header">
+        <span class="card-icon">💰</span>
+        <span class="card-title">Bidding System</span>
+      </div>
+      <div class="card-content">
+        <ul>
+          <li><span class="highlight">Min bid: $1</span> - No maximum per movie</li>
+          <li>Win up to <span class="highlight">2 movies</span> per auction</li>
+          <li><span class="highlight">Highest bid wins</span> the movie</li>
+          <li>Set <span class="highlight">priorities</span> if you might win 3+</li>
+        </ul>
+        <div class="tip-note">Use "$1 on All" to quickly bid minimum on everything!</div>
+      </div>
+    </div>
+
+    <div class="card scoring">
+      <div class="card-header">
+        <span class="card-icon">⭐</span>
+        <span class="card-title">Scoring Formula</span>
+      </div>
+      <div class="card-content">
+        <div class="formula-box">
+          Box Office = min(15, (Domestic BO ÷ Theaters) ÷ 1000)<br>
+          Base Score = Box Office × Metacritic (0-1)<br>
+          Final = Base + Oscar Points
+        </div>
+        <ul>
+          <li><span class="highlight">Oscar Nom:</span> +0.5 pts each</li>
+          <li><span class="highlight">Oscar Win:</span> +1.0 pts each</li>
+          <li><span class="highlight">Best Picture:</span> +0.5 nom / +1.0 win bonus</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card budget">
+      <div class="card-header">
+        <span class="card-icon">💵</span>
+        <span class="card-title">Budget Management</span>
+      </div>
+      <div class="card-content">
+        <ul>
+          <li>Start with <span class="highlight">$1,000</span> for the season</li>
+          <li>Budget <span class="highlight">deducted</span> when you win</li>
+          <li>Cannot bid more than remaining budget</li>
+          <li><span class="highlight">No bids?</span> Auto-assigned 2 movies @ ~$20</li>
+        </ul>
+        <div class="tip-note">Plan ahead - budget must last all auctions!</div>
+      </div>
+    </div>
+
+    <div class="card tiebreak">
+      <div class="card-header">
+        <span class="card-icon">⚖️</span>
+        <span class="card-title">Tie-Breakers</span>
+      </div>
+      <div class="card-content">
+        <p style="margin-bottom: 3px; font-size: 0.4rem; color: #94a3b8;">When two teams bid the same amount:</p>
+        <ul>
+          <li><span class="highlight">Lower-ranked team wins</span> (helps underdogs!)</li>
+          <li><span class="highlight">Same rank?</span> Random selection</li>
+        </ul>
+        <div class="tip-note">Being behind in standings gives you tie-break advantage!</div>
+      </div>
+    </div>
+
+    <div class="card tips">
+      <div class="card-header">
+        <span class="card-icon">💡</span>
+        <span class="card-title">Winning Strategies</span>
+      </div>
+      <div class="card-content">
+        <ul>
+          <li><span class="highlight">Diversify</span> - Don't blow budget on one movie</li>
+          <li><span class="highlight">Oscar bait</span> - Prestige films score big late</li>
+          <li><span class="highlight">Blockbusters</span> - High box office = base score</li>
+          <li><span class="highlight">Hidden gems</span> - High Metacritic + moderate BO</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card" style="grid-column: span 2;">
+      <div class="card-header">
+        <span class="card-icon">📊</span>
+        <span class="card-title">Score Examples</span>
+      </div>
+      <div class="card-content">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+          <div>
+            <p style="font-weight: 600; color: #fff; font-size: 0.45rem; margin-bottom: 2px;">Blockbuster Hit</p>
+            <ul style="font-size: 0.4rem;">
+              <li>$100M domestic / 2,500 theaters = 40</li>
+              <li>Capped at 15, × 0.85 Metacritic</li>
+              <li>Final: <span class="highlight">12.75 pts</span></li>
+            </ul>
+          </div>
+          <div>
+            <p style="font-weight: 600; color: #fff; font-size: 0.45rem; margin-bottom: 2px;">Oscar Darling</p>
+            <ul style="font-size: 0.4rem;">
+              <li>$10M / 1,000 theaters × 0.75 = 7.5</li>
+              <li>+ 5 noms, 2 wins, BP nom = +5 pts</li>
+              <li>Final: <span class="highlight">12.5 pts</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card quick-ref">
+      <div class="card-header">
+        <span class="card-icon">📋</span>
+        <span class="card-title">Quick Reference</span>
+      </div>
+      <div class="quick-ref-grid">
+        <div class="stat-box">
+          <div class="stat-value">$1,000</div>
+          <div class="stat-label">Starting Budget</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">$1</div>
+          <div class="stat-label">Min Bid</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">2</div>
+          <div class="stat-label">Max Wins/Auction</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">15x</div>
+          <div class="stat-label">Box Office Cap</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">+0.5</div>
+          <div class="stat-label">Per Oscar Nom</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value">+1.0</div>
+          <div class="stat-label">Per Oscar Win</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">Movie League • May the best cinephile win!</div>
+</body>
+</html>
