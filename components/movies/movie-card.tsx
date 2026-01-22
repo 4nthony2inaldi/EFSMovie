@@ -6,6 +6,7 @@ import { formatScore, formatBoxOffice, formatMetacritic } from '@/lib/scoring';
 import { getScoreTier, MONTH_NAMES } from '@/types';
 import type { Movie, ReleaseType } from '@/types';
 import { Badge } from '@/components/ui/badge';
+import { WatchlistButton } from '@/components/movies/watchlist-button';
 import { Film, Calendar, Star, TrendingUp, Rocket } from 'lucide-react';
 
 const RELEASE_TYPE_CONFIG: Record<ReleaseType, { label: string; className: string }> = {
@@ -19,9 +20,11 @@ interface MovieCardProps {
   movie: Movie;
   ownerName?: string | null;
   showOwner?: boolean;
+  isOnWatchlist?: boolean;
+  showWatchlistButton?: boolean;
 }
 
-export function MovieCard({ movie, ownerName, showOwner = true }: MovieCardProps) {
+export function MovieCard({ movie, ownerName, showOwner = true, isOnWatchlist = false, showWatchlistButton = true }: MovieCardProps) {
   const scoreTier = getScoreTier(movie.calculated_score);
 
   // Calculate achievement indicators
@@ -114,6 +117,15 @@ export function MovieCard({ movie, ownerName, showOwner = true }: MovieCardProps
               <span className="flex items-center gap-0.5 text-purple-600" title="Beat critic floor">
                 <Rocket className="h-3.5 w-3.5" />
               </span>
+            )}
+            {/* Watchlist button */}
+            {showWatchlistButton && (
+              <WatchlistButton
+                movieId={movie.id}
+                initialInterested={isOnWatchlist}
+                variant="icon"
+                className="ml-auto"
+              />
             )}
           </div>
         </div>

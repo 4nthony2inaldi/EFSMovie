@@ -92,6 +92,16 @@ export default async function MoviesPage({
     }
   });
 
+  // Get user's watchlist
+  const watchlistSet = new Set<string>();
+  if (user) {
+    const { data: interests } = await supabase
+      .from('movie_interests')
+      .select('movie_id')
+      .eq('user_id', user.id);
+    (interests || []).forEach((i) => watchlistSet.add(i.movie_id));
+  }
+
   let filteredMovies = movies || [];
   if (params.owner === 'owned') {
     filteredMovies = filteredMovies.filter((m) => ownershipMap.has(m.id));
@@ -223,6 +233,7 @@ export default async function MoviesPage({
               <MovieCard
                 movie={movie}
                 ownerName={ownershipMap.get(movie.id)}
+                isOnWatchlist={watchlistSet.has(movie.id)}
               />
             </div>
           ))}

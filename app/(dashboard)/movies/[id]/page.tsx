@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/layout/header';
 import { ScoreBreakdown } from '@/components/movies/score-breakdown';
+import { WatchlistButton } from '@/components/movies/watchlist-button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatScore, formatBoxOffice, formatTheaters, formatMetacritic } from '@/lib/scoring';
@@ -51,6 +52,19 @@ export default async function MovieDetailPage({
     `)
     .eq('movie_id', id)
     .single();
+
+  // Get current user and watchlist status
+  const { data: { user } } = await supabase.auth.getUser();
+  let isOnWatchlist = false;
+  if (user) {
+    const { data: interest } = await supabase
+      .from('movie_interests')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('movie_id', id)
+      .single();
+    isOnWatchlist = !!interest;
+  }
 
   const scoreTier = getScoreTier(movie.calculated_score);
   const scoreClasses = {
@@ -156,28 +170,34 @@ export default async function MovieDetailPage({
                     <p className="text-gray-700 leading-relaxed">{movie.synopsis}</p>
                   )}
 
-                  {/* Ownership */}
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    {ownership ? (
-                      <div className="flex items-center gap-2">
-                        <Badge variant="purple">Owned</Badge>
-                        <span className="text-gray-600">by</span>
-                        <Link
-                          href={`/teams/${ownership.team?.id}`}
-                          className="font-medium text-purple-600 hover:text-purple-700"
-                        >
-                          {ownership.team?.name}
-                        </Link>
-                        {ownership.auction && (
-                          <span className="text-gray-500 text-sm">
-                            ({getMonthName(ownership.auction.for_month)} auction,{' '}
-                            {formatCurrency(ownership.winning_bid)})
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <Badge variant="gray">Unowned</Badge>
-                    )}
+                  {/* Ownership & Watchlist */}
+                  <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      {ownership ? (
+                        <>
+                          <Badge variant="purple">Owned</Badge>
+                          <span className="text-gray-600">by</span>
+                          <Link
+                            href={`/teams/${ownership.team?.id}`}
+                            className="font-medium text-purple-600 hover:text-purple-700"
+                          >
+                            {ownership.team?.name}
+                          </Link>
+                          {ownership.auction && (
+                            <span className="text-gray-500 text-sm">
+                              ({getMonthName(ownership.auction.for_month)} auction,{' '}
+                              {formatCurrency(ownership.winning_bid)})
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <Badge variant="gray">Unowned</Badge>
+                      )}
+                    </div>
+                    <WatchlistButton
+                      movieId={movie.id}
+                      initialInterested={isOnWatchlist}
+                    />
                   </div>
                 </div>
               </div>

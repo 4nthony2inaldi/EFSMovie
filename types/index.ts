@@ -114,6 +114,13 @@ export interface NotificationLog {
   sent_at: string;
 }
 
+export interface MovieInterest {
+  id: string;
+  user_id: string;
+  movie_id: string;
+  created_at: string;
+}
+
 // Extended types with relations
 export interface TeamWithMovies extends Team {
   movies: (TeamMovie & { movie: Movie })[];
