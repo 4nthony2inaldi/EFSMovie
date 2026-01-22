@@ -9,59 +9,67 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
       color: #ffffff;
-      padding: 8px 12px;
+      padding: 24px 32px;
+      min-height: 100vh;
     }
-    .header { text-align: center; margin-bottom: 8px; }
-    .header h1 { font-size: 1.4rem; font-weight: 800; color: #f5af19; margin-bottom: 1px; }
-    .header p { color: #94a3b8; font-size: 0.55rem; }
-    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .header { text-align: center; margin-bottom: 24px; }
+    .header h1 { font-size: 2.2rem; font-weight: 800; color: #f5af19; margin-bottom: 6px; }
+    .header p { color: #e2e8f0; font-size: 1rem; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
     .card {
-      background: rgba(255, 255, 255, 0.07);
-      border-radius: 6px;
-      padding: 6px 8px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 16px 20px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
     }
     .card-header {
       display: flex;
       align-items: center;
-      gap: 4px;
-      margin-bottom: 4px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-      padding-bottom: 3px;
+      gap: 8px;
+      margin-bottom: 12px;
+      border-bottom: 2px solid rgba(255,255,255,0.15);
+      padding-bottom: 8px;
     }
-    .card-icon { font-size: 0.7rem; }
-    .card-title { font-size: 0.55rem; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.3px; }
-    .card-content { font-size: 0.45rem; line-height: 1.35; color: #cbd5e1; }
+    .card-icon { font-size: 1.2rem; }
+    .card-title { font-size: 0.95rem; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.5px; }
+    .card-content { font-size: 0.9rem; line-height: 1.6; color: #e2e8f0; }
     .card-content ul { list-style: none; }
-    .card-content li { position: relative; padding-left: 8px; margin-bottom: 2px; }
-    .card-content li::before { content: "•"; position: absolute; left: 0; font-weight: bold; }
-    .auction li::before { color: #667eea; }
-    .bidding li::before { color: #38ef7d; }
-    .scoring li::before { color: #f5af19; }
-    .budget li::before { color: #00c9ff; }
-    .tiebreak li::before { color: #fc466b; }
-    .tips li::before { color: #f093fb; }
-    .highlight { color: #fff; font-weight: 600; }
+    .card-content li { position: relative; padding-left: 16px; margin-bottom: 6px; }
+    .card-content li::before { content: "•"; position: absolute; left: 0; font-weight: bold; font-size: 1.1rem; }
+    .auction li::before { color: #818cf8; }
+    .bidding li::before { color: #4ade80; }
+    .scoring li::before { color: #fbbf24; }
+    .budget li::before { color: #22d3ee; }
+    .tiebreak li::before { color: #fb7185; }
+    .tips li::before { color: #e879f9; }
+    .highlight { color: #fff; font-weight: 700; }
     .formula-box {
-      background: rgba(0, 0, 0, 0.3);
-      border-radius: 3px;
-      padding: 3px 5px;
-      margin: 3px 0;
-      font-family: monospace;
-      font-size: 0.4rem;
-      border-left: 2px solid #f5af19;
+      background: rgba(0, 0, 0, 0.35);
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin: 10px 0;
+      font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+      font-size: 0.85rem;
+      line-height: 1.7;
+      border-left: 4px solid #f5af19;
+      color: #fef3c7;
     }
     .quick-ref {
-      grid-column: span 4;
-      background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
-      border: 1px solid rgba(102, 126, 234, 0.2);
+      grid-column: span 2;
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+      border: 1px solid rgba(102, 126, 234, 0.3);
     }
-    .quick-ref-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 4px; }
-    .stat-box { text-align: center; background: rgba(0, 0, 0, 0.2); border-radius: 4px; padding: 4px 2px; }
-    .stat-value { font-size: 0.7rem; font-weight: 800; color: #fff; }
-    .stat-label { font-size: 0.35rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.2px; }
-    .tip-note { margin-top: 2px; font-size: 0.4rem; color: #f5af19; font-style: italic; }
-    .footer { text-align: center; margin-top: 6px; color: #64748b; font-size: 0.4rem; }
+    .quick-ref-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-top: 12px; }
+    .stat-box { text-align: center; background: rgba(0, 0, 0, 0.25); border-radius: 8px; padding: 12px 8px; }
+    .stat-value { font-size: 1.4rem; font-weight: 800; color: #fff; }
+    .stat-label { font-size: 0.7rem; color: #cbd5e1; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 4px; }
+    .tip-note { margin-top: 10px; font-size: 0.85rem; color: #fbbf24; font-style: italic; padding-left: 4px; }
+    .footer { text-align: center; margin-top: 20px; color: #94a3b8; font-size: 0.85rem; }
+    .examples-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .example-block { background: rgba(0,0,0,0.2); border-radius: 8px; padding: 12px; }
+    .example-title { font-weight: 700; color: #fff; font-size: 0.95rem; margin-bottom: 8px; }
+    .example-block ul { font-size: 0.85rem; }
+    .example-block li { margin-bottom: 4px; }
     @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   </style>
 </head>
@@ -145,7 +153,7 @@
         <span class="card-title">Tie-Breakers</span>
       </div>
       <div class="card-content">
-        <p style="margin-bottom: 3px; font-size: 0.4rem; color: #94a3b8;">When two teams bid the same amount:</p>
+        <p style="margin-bottom: 8px; color: #cbd5e1;">When two teams bid the same amount:</p>
         <ul>
           <li><span class="highlight">Lower-ranked team wins</span> (helps underdogs!)</li>
           <li><span class="highlight">Same rank?</span> Random selection</li>
@@ -175,18 +183,18 @@
         <span class="card-title">Score Examples</span>
       </div>
       <div class="card-content">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-          <div>
-            <p style="font-weight: 600; color: #fff; font-size: 0.45rem; margin-bottom: 2px;">Blockbuster Hit</p>
-            <ul style="font-size: 0.4rem;">
+        <div class="examples-grid">
+          <div class="example-block">
+            <p class="example-title">Blockbuster Hit</p>
+            <ul>
               <li>$100M domestic / 2,500 theaters = 40</li>
               <li>Capped at 15, × 0.85 Metacritic</li>
               <li>Final: <span class="highlight">12.75 pts</span></li>
             </ul>
           </div>
-          <div>
-            <p style="font-weight: 600; color: #fff; font-size: 0.45rem; margin-bottom: 2px;">Oscar Darling</p>
-            <ul style="font-size: 0.4rem;">
+          <div class="example-block">
+            <p class="example-title">Oscar Darling</p>
+            <ul>
               <li>$10M / 1,000 theaters × 0.75 = 7.5</li>
               <li>+ 5 noms, 2 wins, BP nom = +5 pts</li>
               <li>Final: <span class="highlight">12.5 pts</span></li>
