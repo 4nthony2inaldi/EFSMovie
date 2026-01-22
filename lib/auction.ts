@@ -4,6 +4,7 @@ interface MovieAssignment {
   teamId: string;
   movieId: string;
   winningBid: number;
+  priority: number | null;
 }
 
 /**
@@ -78,6 +79,7 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
 
   // 5. Track wins per team (max 2 each)
   const teamWinCount = new Map<string, number>();
+  const teamAssignments = new Map<string, MovieAssignment[]>(); // Track assignments per team for priority swaps
   const assignments: MovieAssignment[] = [];
 
   // 6. Sort movies by total bid value (highest interest first)
@@ -90,6 +92,17 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
       .reduce((sum, bid) => sum + bid.amount, 0);
     return bTotalBids - aTotalBids;
   });
+
+  // Helper function to get effective priority (lower = higher priority)
+  // If no priority set, use a high number based on amount (lower amounts = lower priority)
+  const getEffectivePriority = (bid: { priority: number | null; amount: number }) => {
+    if (bid.priority !== null && bid.priority > 0) {
+      return bid.priority;
+    }
+    // Default: sort by amount descending, so higher amounts get lower (better) priority
+    // Use 1000 as a base to ensure explicit priorities always come first
+    return 1000 - bid.amount;
+  };
 
   // 7. Process each movie
   for (const auctionMovie of sortedMovies) {
@@ -112,21 +125,120 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
         return b.tiebreaker - a.tiebreaker;
       });
 
-    // Find first eligible bidder (hasn't won 2 movies yet)
+    // Find first eligible bidder
     for (const bid of movieBids) {
       const currentWins = teamWinCount.get(bid.team_id) || 0;
+      const currentTeamAssignments = teamAssignments.get(bid.team_id) || [];
+
       if (currentWins < 2) {
-        // Assign movie to this team
-        assignments.push({
+        // Team has room, assign directly
+        const assignment: MovieAssignment = {
           teamId: bid.team_id,
           movieId: movieId,
           winningBid: bid.amount,
+          priority: bid.priority,
+        };
+        assignments.push(assignment);
+        currentTeamAssignments.push(assignment);
+        teamAssignments.set(bid.team_id, currentTeamAssignments);
+        teamWinCount.set(bid.team_id, currentWins + 1);
+        break;
+      } else {
+        // Team already has 2 movies - check if this one has higher priority
+        const thisPriority = getEffectivePriority(bid);
+
+        // Find the lowest priority (highest number) current assignment for this team
+        let lowestPriorityIdx = -1;
+        let lowestPriority = -Infinity;
+
+        currentTeamAssignments.forEach((assignment, idx) => {
+          const assignmentBid = (allBids || []).find(
+            (b) => b.movie_id === assignment.movieId && b.team_id === bid.team_id
+          );
+          if (assignmentBid) {
+            const assignmentPriority = getEffectivePriority(assignmentBid);
+            if (assignmentPriority > lowestPriority) {
+              lowestPriority = assignmentPriority;
+              lowestPriorityIdx = idx;
+            }
+          }
         });
+
+        // If this movie has better priority, swap it in
+        if (thisPriority < lowestPriority && lowestPriorityIdx >= 0) {
+          // Remove the old assignment from the main list
+          const removedAssignment = currentTeamAssignments[lowestPriorityIdx];
+          const mainIdx = assignments.findIndex(
+            (a) => a.movieId === removedAssignment.movieId && a.teamId === removedAssignment.teamId
+          );
+          if (mainIdx >= 0) {
+            assignments.splice(mainIdx, 1);
+          }
+
+          // Add the new assignment
+          const newAssignment: MovieAssignment = {
+            teamId: bid.team_id,
+            movieId: movieId,
+            winningBid: bid.amount,
+            priority: bid.priority,
+          };
+          assignments.push(newAssignment);
+
+          // Update team's assignments
+          currentTeamAssignments.splice(lowestPriorityIdx, 1, newAssignment);
+          teamAssignments.set(bid.team_id, currentTeamAssignments);
+
+          // Note: The removed movie will be processed again in a later pass
+          // to find its new owner (next highest bidder who's eligible)
+          break;
+        }
+        // If this movie doesn't have higher priority, skip this bidder and try next
+      }
+    }
+    // If no eligible bidder found, movie goes unowned
+  }
+
+  // 7b. Second pass: Reassign movies that were bumped due to priority swaps
+  // Find movies in auctionMovies that aren't in assignments
+  const assignedMovieIds = new Set(assignments.map((a) => a.movieId));
+  const unassignedMovies = sortedMovies.filter((am) => !assignedMovieIds.has(am.movie_id));
+
+  for (const auctionMovie of unassignedMovies) {
+    const movieId = auctionMovie.movie_id;
+
+    // Get all non-zero bids for this movie, excluding teams that already have 2 wins
+    const movieBids = (allBids || [])
+      .filter((b) => b.movie_id === movieId && b.amount > 0)
+      .filter((b) => (teamWinCount.get(b.team_id) || 0) < 2)
+      .map((b) => ({
+        ...b,
+        standingsRank: standingsMap.get(b.team_id)?.rank || 999,
+        tiebreaker: standingsMap.get(b.team_id)?.tiebreaker || Math.random(),
+      }))
+      .sort((a, b) => {
+        if (b.amount !== a.amount) return b.amount - a.amount;
+        if (b.standingsRank !== a.standingsRank) return b.standingsRank - a.standingsRank;
+        return b.tiebreaker - a.tiebreaker;
+      });
+
+    // Assign to first eligible bidder
+    for (const bid of movieBids) {
+      const currentWins = teamWinCount.get(bid.team_id) || 0;
+      if (currentWins < 2) {
+        const assignment: MovieAssignment = {
+          teamId: bid.team_id,
+          movieId: movieId,
+          winningBid: bid.amount,
+          priority: bid.priority,
+        };
+        assignments.push(assignment);
+        const currentTeamAssignments = teamAssignments.get(bid.team_id) || [];
+        currentTeamAssignments.push(assignment);
+        teamAssignments.set(bid.team_id, currentTeamAssignments);
         teamWinCount.set(bid.team_id, currentWins + 1);
         break;
       }
     }
-    // If no eligible bidder found, movie goes unowned
   }
 
   // 8. Auto-assign movies to teams that didn't submit any bids
@@ -220,6 +332,7 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
         teamId: team.id,
         movieId: movieId,
         winningBid: pricePerMovie,
+        priority: null,
       });
       teamWinCount.set(team.id, (teamWinCount.get(team.id) || 0) + 1);
     }

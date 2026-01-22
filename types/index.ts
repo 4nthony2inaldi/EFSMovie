@@ -83,6 +83,7 @@ export interface Bid {
   team_id: string;
   movie_id: string;
   amount: number;
+  priority: number | null; // User-defined priority (lower = higher priority), null = default (by amount)
   submitted_at: string;
   updated_at: string;
 }

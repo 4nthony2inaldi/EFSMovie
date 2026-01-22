@@ -28,8 +28,10 @@ import {
   Globe,
   Plus,
   User,
+  ListOrdered,
 } from 'lucide-react';
 import { AuctionTmdbBrowser } from '@/components/auction/auction-tmdb-browser';
+import { BidPriorityManager } from '@/components/auction/bid-priority-manager';
 
 export default function AuctionDetailPage({
   params,
@@ -43,6 +45,8 @@ export default function AuctionDetailPage({
   const [movies, setMovies] = useState<Movie[]>([]);
   const [bids, setBids] = useState<Map<string, number>>(new Map());
   const [savedBids, setSavedBids] = useState<Map<string, number>>(new Map());
+  const [priorities, setPriorities] = useState<Map<string, number>>(new Map());
+  const [savedPriorities, setSavedPriorities] = useState<Map<string, number>>(new Map());
   const [team, setTeam] = useState<Team | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -52,6 +56,7 @@ export default function AuctionDetailPage({
   const [seasonEndMonth, setSeasonEndMonth] = useState<number | null>(null);
   const [seasonEndYear, setSeasonEndYear] = useState<number | null>(null);
   const [showTmdbBrowser, setShowTmdbBrowser] = useState(false);
+  const [showMobilePriority, setShowMobilePriority] = useState(false);
   const [existingTmdbIds, setExistingTmdbIds] = useState<number[]>([]);
   const [userAddedCount, setUserAddedCount] = useState(0);
   const [userAddedMovieIds, setUserAddedMovieIds] = useState<Set<string>>(new Set());
@@ -141,11 +146,17 @@ export default function AuctionDetailPage({
         .eq('team_id', teamData.id);
 
       const bidMap = new Map<string, number>();
+      const priorityMap = new Map<string, number>();
       existingBids?.forEach((bid) => {
         bidMap.set(bid.movie_id, bid.amount);
+        if (bid.priority !== null && bid.priority !== undefined) {
+          priorityMap.set(bid.movie_id, bid.priority);
+        }
       });
       setBids(new Map(bidMap));
       setSavedBids(new Map(bidMap));
+      setPriorities(new Map(priorityMap));
+      setSavedPriorities(new Map(priorityMap));
 
       // If resolved, get results
       if (auctionData.status === 'resolved') {
@@ -256,6 +267,7 @@ export default function AuctionDetailPage({
 
   // Check if there are unsaved changes
   const hasUnsavedChanges = useCallback(() => {
+    // Check bids
     if (bids.size !== savedBids.size) return true;
     const bidEntries = Array.from(bids.entries());
     for (const [movieId, amount] of bidEntries) {
@@ -265,8 +277,18 @@ export default function AuctionDetailPage({
     for (const movieId of savedKeys) {
       if (!bids.has(movieId)) return true;
     }
+    // Check priorities
+    if (priorities.size !== savedPriorities.size) return true;
+    const priorityEntries = Array.from(priorities.entries());
+    for (const [movieId, priority] of priorityEntries) {
+      if (savedPriorities.get(movieId) !== priority) return true;
+    }
+    const savedPriorityKeys = Array.from(savedPriorities.keys());
+    for (const movieId of savedPriorityKeys) {
+      if (!priorities.has(movieId)) return true;
+    }
     return false;
-  }, [bids, savedBids]);
+  }, [bids, savedBids, priorities, savedPriorities]);
 
   // Submit all bids
   const submitBids = async () => {
@@ -275,7 +297,7 @@ export default function AuctionDetailPage({
     setSubmitting(true);
     setSubmitSuccess(false);
 
-    // Build upsert array for all bids
+    // Build upsert array for all bids (including priorities)
     const bidUpserts = Array.from(bids.entries())
       .filter(([_, amount]) => amount > 0)
       .map(([movieId, amount]) => ({
@@ -283,6 +305,7 @@ export default function AuctionDetailPage({
         team_id: team.id,
         movie_id: movieId,
         amount,
+        priority: priorities.get(movieId) ?? null,
         updated_at: new Date().toISOString(),
       }));
 
@@ -311,6 +334,7 @@ export default function AuctionDetailPage({
 
     // Update saved state
     setSavedBids(new Map(bids));
+    setSavedPriorities(new Map(priorities));
     setSubmitting(false);
     setSubmitSuccess(true);
     setTimeout(() => setSubmitSuccess(false), 3000);
@@ -332,6 +356,8 @@ export default function AuctionDetailPage({
     // Clear local state
     setBids(new Map());
     setSavedBids(new Map());
+    setPriorities(new Map());
+    setSavedPriorities(new Map());
     setSubmitting(false);
     setSubmitSuccess(false);
   };
@@ -730,6 +756,37 @@ export default function AuctionDetailPage({
                 />
               )}
 
+              {/* Mobile Priority Manager Toggle + Panel */}
+              {nonZeroBidCount > 2 && (
+                <div className="lg:hidden">
+                  <button
+                    onClick={() => setShowMobilePriority(!showMobilePriority)}
+                    className={cn(
+                      "w-full flex items-center justify-between gap-2 px-4 py-3 rounded-lg font-medium transition-colors text-sm",
+                      showMobilePriority
+                        ? "bg-purple-100 text-purple-700 border border-purple-300"
+                        : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <ListOrdered className="h-4 w-4" />
+                      <span>Set Bid Priority</span>
+                    </div>
+                    <Badge variant="purple">{nonZeroBidCount} bids</Badge>
+                  </button>
+                  {showMobilePriority && (
+                    <div className="mt-2">
+                      <BidPriorityManager
+                        bids={bids}
+                        priorities={priorities}
+                        movies={movies}
+                        onPrioritiesChange={setPriorities}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Empty state when no movies in auction */}
               {movies.length === 0 && !showTmdbBrowser && (
                 <Card className="border-dashed border-2 border-gray-300">
@@ -778,6 +835,16 @@ export default function AuctionDetailPage({
                 totalBudget={team?.budget_remaining || 0}
                 totalBids={maxSpend}
               />
+
+              {/* Bid Priority Manager */}
+              {nonZeroBidCount > 0 && (
+                <BidPriorityManager
+                  bids={bids}
+                  priorities={priorities}
+                  movies={movies}
+                  onPrioritiesChange={setPriorities}
+                />
+              )}
 
               {/* Minimum Bids Requirement */}
               <Card>
