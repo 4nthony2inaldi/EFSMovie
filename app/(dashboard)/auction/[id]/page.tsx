@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { AuctionTmdbBrowser } from '@/components/auction/auction-tmdb-browser';
 import { BidPriorityManager } from '@/components/auction/bid-priority-manager';
+import { useLeague } from '@/contexts/league-context';
 
 export default function AuctionDetailPage({
   params,
@@ -41,6 +42,7 @@ export default function AuctionDetailPage({
   const router = useRouter();
   const supabase = createClient();
   const auctionId = params.id;
+  const { currentTeam } = useLeague();
   const [auction, setAuction] = useState<Auction | null>(null);
   const [movies, setMovies] = useState<Movie[]>([]);
   const [bids, setBids] = useState<Map<string, number>>(new Map());
@@ -68,21 +70,16 @@ export default function AuctionDetailPage({
     async function loadData() {
       setLoading(true);
 
-      // Get current user and team
+      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.push('/login');
         return;
       }
 
-      const { data: teamData } = await supabase
-        .from('teams')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!teamData) return;
-      setTeam(teamData);
+      // Use current team from context
+      if (!currentTeam) return;
+      setTeam(currentTeam);
 
       // Get auction with league info
       const { data: auctionData } = await supabase
@@ -128,7 +125,7 @@ export default function AuctionDetailPage({
         }
         if (am.added_by_team_id) {
           userAdded.add(am.movie_id);
-          if (am.added_by_team_id === teamData.id) {
+          if (am.added_by_team_id === currentTeam.id) {
             userAddCount++;
           }
         }
@@ -143,7 +140,7 @@ export default function AuctionDetailPage({
         .from('bids')
         .select('*')
         .eq('auction_id', auctionId)
-        .eq('team_id', teamData.id);
+        .eq('team_id', currentTeam.id);
 
       const bidMap = new Map<string, number>();
       const priorityMap = new Map<string, number>();
@@ -187,7 +184,7 @@ export default function AuctionDetailPage({
             winning_bid: ownership?.winning_bid || 0,
             your_bid: yourBid?.amount || null,
             status: ownership
-              ? ownership.team_id === teamData.id
+              ? ownership.team_id === currentTeam.id
                 ? 'won'
                 : 'outbid'
               : yourBid
@@ -203,7 +200,7 @@ export default function AuctionDetailPage({
     }
 
     loadData();
-  }, [auctionId, supabase, router]);
+  }, [auctionId, supabase, router, currentTeam]);
 
   // Reload movies when a new movie is added via TMDB browser
   const reloadMovies = useCallback(async () => {

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentTeam } from '@/lib/get-current-team';
 import { redirect } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { MovieCard } from '@/components/movies/movie-card';
@@ -17,12 +18,8 @@ export default async function WatchlistPage() {
     redirect('/login');
   }
 
-  // Get user's league for ownership info
-  const { data: userTeam } = await supabase
-    .from('teams')
-    .select('league_id')
-    .eq('user_id', user.id)
-    .single();
+  // Get user's current team for ownership info
+  const currentTeam = await getCurrentTeam();
 
   // Get user's watchlist with movie details
   const { data: interests } = await supabase
@@ -52,7 +49,7 @@ export default async function WatchlistPage() {
   const ownershipMap = new Map<string, string>();
   (teamMovies || []).forEach((tm) => {
     const team = tm.team as unknown as { id: string; name: string; league_id: string } | null;
-    if (team && userTeam?.league_id && team.league_id === userTeam.league_id) {
+    if (team && currentTeam?.league_id && team.league_id === currentTeam.league_id) {
       ownershipMap.set(tm.movie_id, team.name);
     }
   });

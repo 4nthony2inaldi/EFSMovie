@@ -17,10 +17,12 @@ import {
   Check,
   AlertTriangle,
 } from 'lucide-react';
+import { useLeague } from '@/contexts/league-context';
 
 export default function SettingsPage() {
   const router = useRouter();
   const supabase = createClient();
+  const { currentTeam, currentLeague, refreshTeams } = useLeague();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,22 +47,17 @@ export default function SettingsPage() {
       }
       setUser(user);
 
-      const { data: team } = await supabase
-        .from('teams')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (team) {
-        setTeam(team);
-        setTeamName(team.name);
+      // Use current team from context
+      if (currentTeam) {
+        setTeam(currentTeam);
+        setTeamName(currentTeam.name);
       }
 
       setLoading(false);
     }
 
     loadData();
-  }, [supabase, router]);
+  }, [supabase, router, currentTeam]);
 
   async function handleUpdateTeam(e: React.FormEvent) {
     e.preventDefault();

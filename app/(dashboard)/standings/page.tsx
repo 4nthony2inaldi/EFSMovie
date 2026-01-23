@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentTeam } from '@/lib/get-current-team';
 import { Header } from '@/components/layout/header';
 import { StandingsTable } from '@/components/standings/standings-table';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -15,16 +16,10 @@ interface TeamWithMovies extends TeamStanding {
 export default async function StandingsPage() {
   const supabase = await createClient();
 
-  // Get user's team to find their league
-  const { data: { user } } = await supabase.auth.getUser();
+  // Get user's current team and league
+  const currentTeam = await getCurrentTeam();
 
-  const { data: userTeam } = await supabase
-    .from('teams')
-    .select('league_id')
-    .eq('user_id', user?.id)
-    .single();
-
-  if (!userTeam?.league_id) {
+  if (!currentTeam?.league_id) {
     return (
       <>
         <Header title="Standings" subtitle="Team leaderboard" />
@@ -37,16 +32,11 @@ export default async function StandingsPage() {
     );
   }
 
-  // Get league info
-  const { data: league } = await supabase
-    .from('leagues')
-    .select('*')
-    .eq('id', userTeam.league_id)
-    .single();
+  const league = currentTeam.league;
 
   // Get standings using the database function
   const { data: standings } = await supabase
-    .rpc('get_league_standings', { p_league_id: userTeam.league_id });
+    .rpc('get_league_standings', { p_league_id: currentTeam.league_id });
 
   // Get movies for each team
   const { data: teamMovies } = await supabase
@@ -56,13 +46,13 @@ export default async function StandingsPage() {
       movie:movies(*),
       team:teams!inner(league_id)
     `)
-    .eq('team.league_id', userTeam.league_id);
+    .eq('team.league_id', currentTeam.league_id);
 
   // Get active auction (open status)
   const { data: activeAuction } = await supabase
     .from('auctions')
     .select('*')
-    .eq('league_id', userTeam.league_id)
+    .eq('league_id', currentTeam.league_id)
     .eq('status', 'open')
     .single();
 
@@ -70,7 +60,7 @@ export default async function StandingsPage() {
   const { data: leagueTeams } = await supabase
     .from('teams')
     .select('id')
-    .eq('league_id', userTeam.league_id);
+    .eq('league_id', currentTeam.league_id);
 
   // Get teams that have submitted bids for the active auction
   let teamsWithBids: Set<string> = new Set();

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentTeam } from '@/lib/get-current-team';
 import type { TeamStanding } from '@/types';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
@@ -13,15 +14,10 @@ import { Users, Trophy, DollarSign, Film } from 'lucide-react';
 export default async function TeamsPage() {
   const supabase = await createClient();
 
-  // Get user's league
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: userTeam } = await supabase
-    .from('teams')
-    .select('league_id')
-    .eq('user_id', user?.id)
-    .single();
+  // Get user's current team and league
+  const currentTeam = await getCurrentTeam();
 
-  if (!userTeam?.league_id) {
+  if (!currentTeam?.league_id) {
     return (
       <>
         <Header title="Teams" subtitle="All teams in your league" />
@@ -36,7 +32,7 @@ export default async function TeamsPage() {
 
   // Get standings
   const { data: standings } = await supabase
-    .rpc('get_league_standings', { p_league_id: userTeam.league_id });
+    .rpc('get_league_standings', { p_league_id: currentTeam.league_id });
 
   if (!standings || standings.length === 0) {
     return (

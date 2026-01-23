@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentTeam } from '@/lib/get-current-team';
 import { Header } from '@/components/layout/header';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -28,13 +29,8 @@ export default async function SchedulePage({
   const supabase = await createClient();
   const tab = params.tab || 'all';
 
-  // Get user's team and league
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: team } = await supabase
-    .from('teams')
-    .select('id, league_id')
-    .eq('user_id', user?.id)
-    .single();
+  // Get user's current team and league
+  const team = await getCurrentTeam();
 
   // Get movies based on tab
   const today = new Date();

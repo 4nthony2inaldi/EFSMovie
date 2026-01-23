@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentTeam } from '@/lib/get-current-team';
 import Link from 'next/link';
 import { Header } from '@/components/layout/header';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -11,15 +12,10 @@ import { Gavel, Calendar, Clock, CheckCircle, Film } from 'lucide-react';
 export default async function AuctionPage() {
   const supabase = await createClient();
 
-  // Get user's team and league
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: team } = await supabase
-    .from('teams')
-    .select('id, league_id, budget_remaining')
-    .eq('user_id', user?.id)
-    .single();
+  // Get user's current team and league
+  const currentTeam = await getCurrentTeam();
 
-  if (!team?.league_id) {
+  if (!currentTeam?.league_id) {
     return (
       <>
         <Header title="Auction" subtitle="Monthly movie auctions" />
@@ -31,6 +27,8 @@ export default async function AuctionPage() {
       </>
     );
   }
+
+  const team = currentTeam;
 
   // Get all auctions for this league
   const { data: auctions } = await supabase

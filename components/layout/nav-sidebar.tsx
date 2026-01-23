@@ -12,13 +12,15 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronRight,
   Shield,
   BookOpen,
   Bookmark,
+  Settings,
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { LeagueSwitcher } from './league-switcher';
+import { useLeague } from '@/contexts/league-context';
 
 const navItems = [
   { href: '/standings', label: 'Standings', icon: Trophy },
@@ -30,17 +32,14 @@ const navItems = [
   { href: '/rules', label: 'Rules', icon: BookOpen },
 ];
 
-interface NavSidebarProps {
-  teamName?: string;
-  teamPhotoUrl?: string | null;
-  isCommissioner?: boolean;
-}
-
-export function NavSidebar({ teamName, teamPhotoUrl, isCommissioner }: NavSidebarProps) {
+export function NavSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { currentTeam } = useLeague();
+
+  const isCommissioner = currentTeam?.is_commissioner || false;
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -88,34 +87,10 @@ export function NavSidebar({ teamName, teamPhotoUrl, isCommissioner }: NavSideba
             </button>
           </div>
 
-          {/* Team info */}
-          {teamName && (
-            <div className="px-6 pb-6">
-              <Link
-                href="/settings"
-                className="flex items-center gap-3 p-3 bg-purple-800/50 rounded-lg hover:bg-purple-800 transition-colors"
-              >
-                <div className="w-10 h-10 rounded-full bg-gold-500 flex items-center justify-center overflow-hidden">
-                  {teamPhotoUrl ? (
-                    <img
-                      src={teamPhotoUrl}
-                      alt={teamName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-gold-900 font-bold text-sm">
-                      {teamName.slice(0, 2).toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{teamName}</p>
-                  <p className="text-purple-300 text-sm">Your Team</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-purple-400" />
-              </Link>
-            </div>
-          )}
+          {/* Team/League Switcher */}
+          <div className="px-6 pb-6">
+            <LeagueSwitcher />
+          </div>
 
           {/* Navigation */}
           <nav className="flex-1 px-4 space-y-1">
@@ -159,8 +134,21 @@ export function NavSidebar({ teamName, teamPhotoUrl, isCommissioner }: NavSideba
             )}
           </nav>
 
-          {/* Sign out */}
-          <div className="p-4 border-t border-purple-700/50">
+          {/* Settings & Sign out */}
+          <div className="p-4 border-t border-purple-700/50 space-y-1">
+            <Link
+              href="/settings"
+              onClick={() => setMobileOpen(false)}
+              className={cn(
+                'flex items-center gap-3 px-4 py-3 w-full rounded-lg transition-colors',
+                pathname === '/settings'
+                  ? 'bg-purple-700 text-white'
+                  : 'text-purple-200 hover:bg-purple-800 hover:text-white'
+              )}
+            >
+              <Settings className="h-5 w-5" />
+              <span>Settings</span>
+            </Link>
             <button
               onClick={handleSignOut}
               className="flex items-center gap-3 px-4 py-3 w-full text-purple-200 hover:bg-purple-800 hover:text-white rounded-lg transition-colors"
