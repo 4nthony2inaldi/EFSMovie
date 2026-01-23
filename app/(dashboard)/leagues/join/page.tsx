@@ -36,10 +36,31 @@ export default function JoinLeaguePage() {
   const [teamName, setTeamName] = useState('');
   const [leagueName, setLeagueName] = useState('');
   const [leaguePassword, setLeaguePassword] = useState('');
+  const [leagueSlug, setLeagueSlug] = useState('');
+  const [slugError, setSlugError] = useState<string | null>(null);
   const [joinLeagueId, setJoinLeagueId] = useState('');
   const [joinPassword, setJoinPassword] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [joinMethod, setJoinMethod] = useState<'password' | 'invite'>('password');
+
+  // Validate and format slug
+  function handleSlugChange(value: string) {
+    const formatted = value
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    setLeagueSlug(formatted);
+
+    if (formatted && formatted.length < 3) {
+      setSlugError('Must be at least 3 characters');
+    } else if (formatted && formatted.length > 32) {
+      setSlugError('Must be 32 characters or less');
+    } else {
+      setSlugError(null);
+    }
+  }
 
   // Check for invite code in URL
   useEffect(() => {
@@ -67,6 +88,12 @@ export default function JoinLeaguePage() {
   async function handleCreateLeague() {
     if (!userId || !teamName.trim() || !leagueName.trim()) return;
 
+    // Validate slug if provided
+    if (slugError) {
+      setError('Please fix the League ID format');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -81,11 +108,19 @@ export default function JoinLeaguePage() {
           season_end_year: currentYear,
           commissioner_user_id: userId,
           join_password: leaguePassword || null,
+          slug: leagueSlug || null,
         })
         .select()
         .single();
 
       if (leagueError) {
+        // Check for unique constraint violation on slug
+        if (leagueError.message.includes('idx_leagues_slug_unique') ||
+            leagueError.message.includes('duplicate') ||
+            leagueError.code === '23505') {
+          setSlugError('This League ID is already taken');
+          throw new Error('This League ID is already taken. Please choose a different one.');
+        }
         throw new Error(leagueError.message || 'Failed to create league');
       }
 
@@ -368,6 +403,28 @@ export default function JoinLeaguePage() {
               </div>
 
               <div>
+                <label htmlFor="leagueSlug" className="label">
+                  Custom League ID <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  id="leagueSlug"
+                  type="text"
+                  value={leagueSlug}
+                  onChange={(e) => handleSlugChange(e.target.value)}
+                  className={`input ${slugError ? 'border-red-500' : ''}`}
+                  placeholder="my-league"
+                  maxLength={32}
+                />
+                {slugError && (
+                  <p className="text-sm text-red-500 mt-1">{slugError}</p>
+                )}
+                <p className="text-sm text-gray-500 mt-1">
+                  3-32 characters, lowercase letters, numbers, and hyphens only.
+                  This is what others will use to join your league.
+                </p>
+              </div>
+
+              <div>
                 <label htmlFor="leaguePassword" className="label">
                   Join Password <span className="text-gray-400 font-normal">(optional)</span>
                 </label>
@@ -380,7 +437,7 @@ export default function JoinLeaguePage() {
                   placeholder="Set a password for others to join"
                 />
                 <p className="text-sm text-gray-500 mt-1">
-                  Others can join with your league ID + this password
+                  Combined with your League ID, others can join without an invite link
                 </p>
               </div>
 
