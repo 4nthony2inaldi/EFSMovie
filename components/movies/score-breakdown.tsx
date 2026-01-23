@@ -4,13 +4,15 @@ import { calculateMovieScore, type MovieStats } from '@/lib/scoring';
 import { formatScore, formatBoxOffice, formatTheaters } from '@/lib/scoring';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { CheckCircle, AlertCircle } from 'lucide-react';
+import type { LeagueScoringSettings } from '@/types';
 
 interface ScoreBreakdownProps {
   stats: MovieStats;
+  leagueSettings?: LeagueScoringSettings;
 }
 
-export function ScoreBreakdown({ stats }: ScoreBreakdownProps) {
-  const breakdown = calculateMovieScore(stats);
+export function ScoreBreakdown({ stats, leagueSettings }: ScoreBreakdownProps) {
+  const breakdown = calculateMovieScore(stats, leagueSettings);
 
   return (
     <Card>
@@ -23,15 +25,16 @@ export function ScoreBreakdown({ stats }: ScoreBreakdownProps) {
           <div className="space-y-1">
             <div className="text-gray-600">Box Office Component</div>
             <div className="bg-gray-50 rounded-lg p-3">
-              {stats.theaterCount >= 5 ? (
+              {stats.theaterCount >= breakdown.minTheatersRequired ? (
                 <>
                   <div className="text-gray-700">
                     ({formatBoxOffice(stats.domesticBoxOffice)} / {formatTheaters(stats.theaterCount)} theaters) / 1000
                   </div>
                   <div className="text-gray-700">
                     = {((stats.domesticBoxOffice / stats.theaterCount) / 1000).toFixed(3)}
-                    {breakdown.boxOfficeComponent === 15 && (
-                      <span className="text-purple-600"> → capped at 15</span>
+                    {breakdown.maxBoxOfficeComponent !== null &&
+                      breakdown.boxOfficeComponent === breakdown.maxBoxOfficeComponent && (
+                      <span className="text-purple-600"> → capped at {breakdown.maxBoxOfficeComponent}</span>
                     )}
                   </div>
                   <div className="font-semibold text-purple-600">
@@ -41,7 +44,7 @@ export function ScoreBreakdown({ stats }: ScoreBreakdownProps) {
               ) : (
                 <div className="flex items-center gap-2 text-gray-500">
                   <AlertCircle className="h-4 w-4" />
-                  Must be in 5+ theaters (currently {stats.theaterCount})
+                  Must be in {breakdown.minTheatersRequired}+ theaters (currently {stats.theaterCount})
                 </div>
               )}
             </div>

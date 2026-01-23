@@ -11,6 +11,16 @@ export interface League {
   scores_frozen_at: string | null;
   created_at: string;
   updated_at: string;
+  // Scoring settings
+  movies_per_auction: number;
+  min_theaters_for_scoring: number;
+  max_box_office_per_theater: number | null;
+}
+
+// League scoring settings for score calculations
+export interface LeagueScoringSettings {
+  minTheaters: number;
+  maxBoxOfficePerTheater: number | null;
 }
 
 export interface Team {

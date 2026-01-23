@@ -11,12 +11,12 @@ interface MovieAssignment {
  * Resolve an auction by determining winners for each movie
  *
  * Rules:
- * - Each team can win at most 2 movies per auction
+ * - Each team can win at most N movies per auction (league's movies_per_auction setting, default 2)
  * - Highest bid wins
  * - Ties are broken by:
  *   1. Lower-ranked team wins (worse standing = wins)
  *   2. Random tiebreaker for true ties (e.g., at season start when all teams are at 0)
- * - Teams that submit no bids are auto-assigned up to 2 random unowned movies
+ * - Teams that submit no bids are auto-assigned up to N random unowned movies
  *   - Price per movie is the minimum of:
  *     - League's auto_assign_max_price setting (default $20)
  *     - League's auto_assign_budget_percent of team's budget ÷ movies assigned (default 5%)
@@ -37,6 +37,10 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
   }
 
   const leagueId = auction.league_id;
+  const league = auction.league;
+
+  // Get league-specific movies per auction setting (default 2)
+  const maxMoviesPerTeam = league?.movies_per_auction ?? 2;
 
   // 2. Get current standings for tie-breaking
   const { data: standings } = await supabase
@@ -77,7 +81,7 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
     .select('*')
     .eq('auction_id', auctionId);
 
-  // 5. Track wins per team (max 2 each)
+  // 5. Track wins per team (max per league setting)
   const teamWinCount = new Map<string, number>();
   const teamAssignments = new Map<string, MovieAssignment[]>(); // Track assignments per team for priority swaps
   const assignments: MovieAssignment[] = [];
@@ -130,7 +134,7 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
       const currentWins = teamWinCount.get(bid.team_id) || 0;
       const currentTeamAssignments = teamAssignments.get(bid.team_id) || [];
 
-      if (currentWins < 2) {
+      if (currentWins < maxMoviesPerTeam) {
         // Team has room, assign directly
         const assignment: MovieAssignment = {
           teamId: bid.team_id,
@@ -144,7 +148,7 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
         teamWinCount.set(bid.team_id, currentWins + 1);
         break;
       } else {
-        // Team already has 2 movies - check if this one has higher priority
+        // Team already has max movies - check if this one has higher priority
         const thisPriority = getEffectivePriority(bid);
 
         // Find the lowest priority (highest number) current assignment for this team
@@ -206,10 +210,10 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
   for (const auctionMovie of unassignedMovies) {
     const movieId = auctionMovie.movie_id;
 
-    // Get all non-zero bids for this movie, excluding teams that already have 2 wins
+    // Get all non-zero bids for this movie, excluding teams that already have max wins
     const movieBids = (allBids || [])
       .filter((b) => b.movie_id === movieId && b.amount > 0)
-      .filter((b) => (teamWinCount.get(b.team_id) || 0) < 2)
+      .filter((b) => (teamWinCount.get(b.team_id) || 0) < maxMoviesPerTeam)
       .map((b) => ({
         ...b,
         standingsRank: standingsMap.get(b.team_id)?.rank || 999,
@@ -224,7 +228,7 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
     // Assign to first eligible bidder
     for (const bid of movieBids) {
       const currentWins = teamWinCount.get(bid.team_id) || 0;
-      if (currentWins < 2) {
+      if (currentWins < maxMoviesPerTeam) {
         const assignment: MovieAssignment = {
           teamId: bid.team_id,
           movieId: movieId,
@@ -264,10 +268,9 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
   const shuffledUnownedMovies = [...unownedMovies].sort(() => Math.random() - 0.5);
 
   // Get league auto-assign settings (with defaults)
-  const league = auction.league;
   const AUTO_ASSIGN_MAX_PRICE = league?.auto_assign_max_price ?? 20;
   const AUTO_ASSIGN_BUDGET_PERCENT = (league?.auto_assign_budget_percent ?? 5) / 100;
-  const AUTO_ASSIGN_COUNT = 2;
+  const AUTO_ASSIGN_COUNT = maxMoviesPerTeam;
   const MINIMUM_BID = 1; // Minimum bid amount per movie
 
   // Calculate remaining auctions after this one

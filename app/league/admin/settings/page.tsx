@@ -17,6 +17,9 @@ interface League {
   max_teams: number;
   auto_assign_max_price: number;
   auto_assign_budget_percent: number;
+  movies_per_auction: number;
+  min_theaters_for_scoring: number;
+  max_box_office_per_theater: number | null;
 }
 
 export default function LeagueSettingsPage() {
@@ -39,6 +42,12 @@ export default function LeagueSettingsPage() {
   const [status, setStatus] = useState('active');
   const [autoAssignMaxPrice, setAutoAssignMaxPrice] = useState(20);
   const [autoAssignBudgetPercent, setAutoAssignBudgetPercent] = useState(5);
+
+  // Scoring settings
+  const [moviesPerAuction, setMoviesPerAuction] = useState(2);
+  const [minTheatersForScoring, setMinTheatersForScoring] = useState(5);
+  const [maxBoxOfficePerTheater, setMaxBoxOfficePerTheater] = useState<number | null>(15);
+  const [noBoxOfficeCap, setNoBoxOfficeCap] = useState(false);
 
   useEffect(() => {
     loadLeague();
@@ -66,6 +75,10 @@ export default function LeagueSettingsPage() {
       setStatus(data.status);
       setAutoAssignMaxPrice(data.auto_assign_max_price ?? 20);
       setAutoAssignBudgetPercent(data.auto_assign_budget_percent ?? 5);
+      setMoviesPerAuction(data.movies_per_auction ?? 2);
+      setMinTheatersForScoring(data.min_theaters_for_scoring ?? 5);
+      setMaxBoxOfficePerTheater(data.max_box_office_per_theater);
+      setNoBoxOfficeCap(data.max_box_office_per_theater === null);
     }
     setLoading(false);
   }
@@ -118,6 +131,9 @@ export default function LeagueSettingsPage() {
         status,
         auto_assign_max_price: autoAssignMaxPrice,
         auto_assign_budget_percent: autoAssignBudgetPercent,
+        movies_per_auction: moviesPerAuction,
+        min_theaters_for_scoring: minTheatersForScoring,
+        max_box_office_per_theater: noBoxOfficeCap ? null : maxBoxOfficePerTheater,
       })
       .eq('id', league.id);
 
@@ -353,6 +369,114 @@ export default function LeagueSettingsPage() {
               <strong>Example:</strong> With $20 max and 5% budget, a team with $500 remaining would pay
               min($20, $500 × 5% ÷ 2) = min($20, $12.50) = <strong>$12.50 per movie</strong>.
               The system also ensures teams keep enough budget for minimum bids on remaining auctions.
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5 text-purple-600" />
+              Scoring Settings
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Customize how movies are scored in your league. These settings affect standings and team rankings.
+            </p>
+
+            <div>
+              <label className="label">Movies Won Per Auction</label>
+              <input
+                type="number"
+                value={moviesPerAuction}
+                onChange={(e) => setMoviesPerAuction(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+                className="input"
+                min={1}
+                max={10}
+                required
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                Maximum movies each team can win per auction (1-10, default: 2)
+              </p>
+            </div>
+
+            <div>
+              <label className="label">Minimum Theaters for Box Office Points</label>
+              <input
+                type="number"
+                value={minTheatersForScoring}
+                onChange={(e) => setMinTheatersForScoring(Math.max(0, Math.min(1000, parseInt(e.target.value) || 0)))}
+                className="input"
+                min={0}
+                max={1000}
+                required
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                Movies must be in at least this many theaters to earn box office points (default: 5).
+                Set to 0 to allow all movies to earn box office points.
+              </p>
+            </div>
+
+            <div>
+              <label className="label">Max $ Per Theater (in thousands)</label>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    value={noBoxOfficeCap ? '' : (maxBoxOfficePerTheater ?? 15)}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      if (!isNaN(val) && val > 0) {
+                        setMaxBoxOfficePerTheater(val);
+                        setNoBoxOfficeCap(false);
+                      }
+                    }}
+                    className="input flex-1"
+                    min={1}
+                    step={1}
+                    disabled={noBoxOfficeCap}
+                    placeholder="15"
+                  />
+                  <span className="text-gray-500">× $1,000</span>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={noBoxOfficeCap}
+                    onChange={(e) => {
+                      setNoBoxOfficeCap(e.target.checked);
+                      if (e.target.checked) {
+                        setMaxBoxOfficePerTheater(null);
+                      } else {
+                        setMaxBoxOfficePerTheater(15);
+                      }
+                    }}
+                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  />
+                  <span className="text-gray-600">No cap (favors blockbusters)</span>
+                </label>
+              </div>
+              <p className="text-sm text-gray-500 mt-1">
+                Cap on the box office per theater component of scoring.
+                Lower values favor smaller/limited release films, higher values or no cap favor wide releases.
+                Default: $15k cap.
+              </p>
+            </div>
+
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-800">
+              <strong>Scoring Formula:</strong> Base Score = (Box Office ÷ Theaters ÷ 1000) × Metacritic Rating
+              <br />
+              <span className="text-purple-600">
+                {noBoxOfficeCap
+                  ? `With no cap, a movie earning $50k/theater would score full 50 × rating.`
+                  : `With a $${maxBoxOfficePerTheater ?? 15}k cap, box office component is capped at ${maxBoxOfficePerTheater ?? 15}.`
+                }
+                {minTheatersForScoring > 0
+                  ? ` Movies need ${minTheatersForScoring}+ theaters to earn box office points.`
+                  : ' All movies earn box office points regardless of theater count.'
+                }
+              </span>
             </div>
           </CardContent>
         </Card>
