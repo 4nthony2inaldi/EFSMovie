@@ -13,7 +13,7 @@ export default function AuthLayout({
         <div className="max-w-7xl mx-auto">
           <Link href="/" className="flex items-center gap-2 w-fit">
             <Film className="h-8 w-8 text-gold-400" />
-            <span className="text-2xl font-bold text-white">EFS Movie League</span>
+            <span className="text-2xl font-bold text-white">Fantasy Movie League</span>
           </Link>
         </div>
       </header>
@@ -29,7 +29,7 @@ export default function AuthLayout({
 
       {/* Footer */}
       <footer className="px-6 py-4 text-center text-purple-300 text-sm">
-        <p>&copy; {new Date().getFullYear()} EFS Movie League</p>
+        <p>&copy; {new Date().getFullYear()} Fantasy Movie League</p>
       </footer>
     </div>
   );

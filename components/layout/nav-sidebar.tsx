@@ -77,7 +77,7 @@ export function NavSidebar() {
           <div className="p-6 flex items-center justify-between">
             <Link href="/standings" className="flex items-center gap-2">
               <Film className="h-8 w-8 text-gold-400" />
-              <span className="text-xl font-bold">EFS Movie</span>
+              <span className="text-xl font-bold">FML</span>
             </Link>
             <button
               onClick={() => setMobileOpen(false)}

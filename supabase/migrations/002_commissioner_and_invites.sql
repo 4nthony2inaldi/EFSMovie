@@ -1,4 +1,4 @@
--- EFS Movie League - Commissioner and Invitations Schema
+-- Fantasy Movie League - Commissioner and Invitations Schema
 -- =====================================================
 
 -- Add commissioner and password to leagues

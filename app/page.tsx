@@ -18,7 +18,7 @@ export default async function Home() {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Film className="h-8 w-8 text-gold-400" />
-            <span className="text-2xl font-bold text-white">EFS Movie League</span>
+            <span className="text-2xl font-bold text-white">Fantasy Movie League</span>
           </div>
           <div className="flex items-center gap-4">
             <Link
@@ -136,7 +136,7 @@ export default async function Home() {
       {/* Footer */}
       <footer className="px-6 py-8 border-t border-purple-700/50">
         <div className="max-w-7xl mx-auto text-center text-purple-300">
-          <p>&copy; {new Date().getFullYear()} EFS Movie League. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Fantasy Movie League. All rights reserved.</p>
         </div>
       </footer>
     </div>

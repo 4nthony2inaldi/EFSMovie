@@ -1,4 +1,4 @@
-# EFSMovie Design System Guide
+# Fantasy Movie League Design System Guide
 
 A comprehensive design methodology guide for maintaining visual consistency across the application. Use this document when building new features or working in other Claude Code sessions.
 
@@ -1287,4 +1287,4 @@ ICONS
 ---
 
 *Last updated: January 2026*
-*EFSMovie Fantasy Movie League*
+*Fantasy Movie League*

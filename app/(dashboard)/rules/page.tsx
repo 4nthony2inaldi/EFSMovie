@@ -48,7 +48,7 @@ export default function RulesPage() {
     <>
       <Header
         title="League Rules"
-        subtitle="How scoring works in EFS Movie League"
+        subtitle="How scoring works in Fantasy Movie League"
       />
 
       {/* Overview Banner */}

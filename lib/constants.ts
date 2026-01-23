@@ -1,4 +1,4 @@
-// EFS Movie League Constants
+// Fantasy Movie League Constants
 
 // Budget
 export const STARTING_BUDGET = 1000;

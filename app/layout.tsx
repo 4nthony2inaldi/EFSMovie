@@ -5,7 +5,7 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'EFS Movie League',
+  title: 'Fantasy Movie League',
   description: 'Fantasy movie league where teams compete by bidding on movies and scoring based on box office, ratings, and Oscar recognition.',
   keywords: ['fantasy', 'movies', 'league', 'box office', 'oscars', 'auction'],
 };

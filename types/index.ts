@@ -1,4 +1,4 @@
-// Database types for EFS Movie League
+// Database types for Fantasy Movie League
 
 export interface League {
   id: string;

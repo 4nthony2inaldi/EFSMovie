@@ -1,4 +1,4 @@
--- EFS Movie League - Initial Database Schema
+-- Fantasy Movie League - Initial Database Schema
 -- ============================================
 
 -- ============================================

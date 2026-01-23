@@ -359,7 +359,7 @@ export default function JoinLeaguePage() {
                   value={leagueName}
                   onChange={(e) => setLeagueName(e.target.value)}
                   className="input"
-                  placeholder="EFS Movie League 2026"
+                  placeholder="Fantasy Movie League 2026"
                   maxLength={100}
                 />
               </div>
