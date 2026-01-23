@@ -276,7 +276,7 @@ export default function JoinLeaguePage() {
         {mode === 'choice' && (
           <div className="space-y-4">
             <p className="text-gray-600 mb-6">
-              You're currently in {teams.length} league{teams.length !== 1 ? 's' : ''}.
+              You&apos;re currently in {teams.length} league{teams.length !== 1 ? 's' : ''}.
               You can create a new league or join an existing one.
             </p>
 
@@ -291,7 +291,7 @@ export default function JoinLeaguePage() {
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-1">Create a New League</h3>
                   <p className="text-sm text-gray-600">
-                    Start a fresh league and invite friends. You'll be the commissioner.
+                    Start a fresh league and invite friends. You&apos;ll be the commissioner.
                   </p>
                 </div>
               </div>
@@ -333,7 +333,7 @@ export default function JoinLeaguePage() {
                 </div>
                 <div>
                   <CardTitle>Create a League</CardTitle>
-                  <p className="text-sm text-gray-600">You'll be the commissioner</p>
+                  <p className="text-sm text-gray-600">You&apos;ll be the commissioner</p>
                 </div>
               </div>
             </CardHeader>
