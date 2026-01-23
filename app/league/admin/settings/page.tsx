@@ -251,7 +251,7 @@ export default function LeagueSettingsPage() {
             <div>
               <label className="label">Custom League ID (for sharing)</label>
               <div className="flex items-center gap-2">
-                <span className="text-gray-500 text-sm">efsmovie.com/join/</span>
+                <span className="text-gray-500 text-sm">fmovieleague.com/join/</span>
                 <input
                   type="text"
                   value={slug}
