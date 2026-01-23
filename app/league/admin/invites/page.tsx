@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useLeague } from '@/contexts/league-context';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { CopyButton } from '@/components/ui/copy-button';
@@ -18,6 +19,7 @@ interface Invitation {
 
 export default function LeagueInvitesPage() {
   const supabase = createClient();
+  const { currentTeam } = useLeague();
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [leagueId, setLeagueId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,29 +30,19 @@ export default function LeagueInvitesPage() {
 
   useEffect(() => {
     loadInvitations();
-  }, []);
+  }, [currentTeam?.league_id]);
 
   async function loadInvitations() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    // Use the current league from context (layout already verified commissioner access)
+    if (!currentTeam?.league_id) return;
 
-    // Get commissioner's league
-    // Use limit(1).maybeSingle() to handle users who are commissioners of multiple leagues
-    const { data: league } = await supabase
-      .from('leagues')
-      .select('id')
-      .eq('commissioner_user_id', user.id)
-      .limit(1)
-      .maybeSingle();
-
-    if (!league) return;
-    setLeagueId(league.id);
+    setLeagueId(currentTeam.league_id);
 
     // Get invitations
     const { data } = await supabase
       .from('league_invitations')
       .select('*')
-      .eq('league_id', league.id)
+      .eq('league_id', currentTeam.league_id)
       .order('created_at', { ascending: false });
 
     setInvitations(data || []);

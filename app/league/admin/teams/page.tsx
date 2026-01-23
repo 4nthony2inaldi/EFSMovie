@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useLeague } from '@/contexts/league-context';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
@@ -17,6 +18,7 @@ interface Team {
 
 export default function LeagueTeamsPage() {
   const supabase = createClient();
+  const { currentTeam } = useLeague();
   const [teams, setTeams] = useState<Team[]>([]);
   const [leagueId, setLeagueId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -26,29 +28,19 @@ export default function LeagueTeamsPage() {
 
   useEffect(() => {
     loadTeams();
-  }, []);
+  }, [currentTeam?.league_id]);
 
   async function loadTeams() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    // Use the current league from context (layout already verified commissioner access)
+    if (!currentTeam?.league_id) return;
 
-    // Get commissioner's league
-    // Use limit(1).maybeSingle() to handle users who are commissioners of multiple leagues
-    const { data: league } = await supabase
-      .from('leagues')
-      .select('id')
-      .eq('commissioner_user_id', user.id)
-      .limit(1)
-      .maybeSingle();
-
-    if (!league) return;
-    setLeagueId(league.id);
+    setLeagueId(currentTeam.league_id);
 
     // Get teams
     const { data } = await supabase
       .from('teams')
       .select('*')
-      .eq('league_id', league.id)
+      .eq('league_id', currentTeam.league_id)
       .order('created_at', { ascending: true });
 
     setTeams(data || []);

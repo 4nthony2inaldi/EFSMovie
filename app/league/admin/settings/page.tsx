@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useLeague } from '@/contexts/league-context';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Settings, Loader2, Save, AlertTriangle } from 'lucide-react';
 
@@ -24,6 +25,7 @@ interface League {
 
 export default function LeagueSettingsPage() {
   const supabase = createClient();
+  const { currentTeam } = useLeague();
   const [league, setLeague] = useState<League | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -51,19 +53,17 @@ export default function LeagueSettingsPage() {
 
   useEffect(() => {
     loadLeague();
-  }, []);
+  }, [currentTeam?.league_id]);
 
   async function loadLeague() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    // Use the current league from context (layout already verified commissioner access)
+    if (!currentTeam?.league_id) return;
 
-    // Use limit(1).maybeSingle() to handle users who are commissioners of multiple leagues
     const { data } = await supabase
       .from('leagues')
       .select('*')
-      .eq('commissioner_user_id', user.id)
-      .limit(1)
-      .maybeSingle();
+      .eq('id', currentTeam.league_id)
+      .single();
 
     if (data) {
       setLeague(data);

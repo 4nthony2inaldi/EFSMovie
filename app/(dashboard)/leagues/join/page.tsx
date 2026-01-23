@@ -90,13 +90,15 @@ export default function JoinLeaguePage() {
       }
 
       // Create the team in this league
-      const { error: teamError } = await supabase
+      const { data: newTeam, error: teamError } = await supabase
         .from('teams')
         .insert({
           league_id: league.id,
           user_id: userId,
           name: teamName.trim(),
-        });
+        })
+        .select()
+        .single();
 
       if (teamError) throw teamError;
 
@@ -105,7 +107,8 @@ export default function JoinLeaguePage() {
       setSuccess(true);
 
       // Switch to the new team by setting cookie and refreshing
-      document.cookie = `efs-selected-team-id=${league.id};path=/;max-age=31536000`;
+      document.cookie = `efs-selected-team-id=${newTeam.id};path=/;max-age=31536000`;
+      localStorage.setItem('efs-selected-team-id', newTeam.id);
 
       // Redirect to league admin
       setTimeout(() => {

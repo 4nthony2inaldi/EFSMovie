@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useLeague } from '@/contexts/league-context';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils';
@@ -30,6 +31,7 @@ const MONTHS = [
 
 export default function LeagueAuctionsPage() {
   const supabase = createClient();
+  const { currentTeam } = useLeague();
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [availableMovies, setAvailableMovies] = useState<Movie[]>([]);
   const [leagueId, setLeagueId] = useState<string | null>(null);
@@ -48,29 +50,19 @@ export default function LeagueAuctionsPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [currentTeam?.league_id]);
 
   async function loadData() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    // Use the current league from context (layout already verified commissioner access)
+    if (!currentTeam?.league_id) return;
 
-    // Get commissioner's league
-    // Use limit(1).maybeSingle() to handle users who are commissioners of multiple leagues
-    const { data: league } = await supabase
-      .from('leagues')
-      .select('id')
-      .eq('commissioner_user_id', user.id)
-      .limit(1)
-      .maybeSingle();
-
-    if (!league) return;
-    setLeagueId(league.id);
+    setLeagueId(currentTeam.league_id);
 
     // Get auctions
     const { data: auctionsData } = await supabase
       .from('auctions')
       .select('*')
-      .eq('league_id', league.id)
+      .eq('league_id', currentTeam.league_id)
       .order('for_year', { ascending: false })
       .order('for_month', { ascending: false });
 

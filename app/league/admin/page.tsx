@@ -3,19 +3,24 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Trophy, Users, Film, Gavel, ChevronRight, Copy, Key } from 'lucide-react';
 import { CopyButton } from '@/components/ui/copy-button';
+import { getCurrentTeam } from '@/lib/get-current-team';
 
 export default async function LeagueAdminDashboardPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
 
-  // Get commissioner's league
-  // Use limit(1).maybeSingle() to handle users who are commissioners of multiple leagues
+  // Get the current team based on the user's cookie selection
+  const currentTeam = await getCurrentTeam();
+
+  if (!currentTeam || !currentTeam.is_commissioner) {
+    return <div>Not authorized</div>;
+  }
+
+  // Get full league details for the current league
   const { data: league } = await supabase
     .from('leagues')
     .select('*')
-    .eq('commissioner_user_id', user?.id)
-    .limit(1)
-    .maybeSingle();
+    .eq('id', currentTeam.league_id)
+    .single();
 
   if (!league) {
     return <div>League not found</div>;

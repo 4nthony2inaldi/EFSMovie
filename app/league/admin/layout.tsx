@@ -1,4 +1,3 @@
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -11,93 +10,88 @@ import {
   Settings,
   Mail,
 } from 'lucide-react';
+import { getCurrentTeam } from '@/lib/get-current-team';
+import { AdminProviders } from './admin-providers';
 
 export default async function LeagueAdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // Get the current team based on the user's cookie selection
+  const currentTeam = await getCurrentTeam();
 
-  if (!user) {
+  if (!currentTeam) {
+    // Not logged in or no teams
     redirect('/login');
   }
 
-  // Get league where user is commissioner
-  // Use limit(1).maybeSingle() to handle users who are commissioners of multiple leagues
-  const { data: league, error } = await supabase
-    .from('leagues')
-    .select('id, name')
-    .eq('commissioner_user_id', user.id)
-    .limit(1)
-    .maybeSingle();
-
-  // Debug logging
-  console.log('[Admin Layout] User ID:', user.id);
-  console.log('[Admin Layout] League query result:', { league, error });
-
-  if (!league) {
-    // Not a commissioner, redirect to standings
-    console.log('[Admin Layout] No league found, redirecting to standings');
+  // Check if the user is commissioner of the CURRENTLY SELECTED league
+  if (!currentTeam.is_commissioner) {
+    // Not a commissioner of the current league, redirect to standings
+    console.log('[Admin Layout] Not commissioner of current league, redirecting to standings');
     redirect('/standings');
   }
 
+  const league = currentTeam.league;
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Admin Header */}
-      <header className="bg-purple-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Shield className="h-8 w-8 text-gold-400" />
-              <div>
-                <h1 className="text-xl font-bold">League Admin</h1>
-                <p className="text-purple-300 text-sm">{league.name}</p>
+    <AdminProviders initialTeam={currentTeam}>
+      <div className="min-h-screen bg-gray-50">
+        {/* Admin Header */}
+        <header className="bg-purple-900 text-white">
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Shield className="h-8 w-8 text-gold-400" />
+                <div>
+                  <h1 className="text-xl font-bold">League Admin</h1>
+                  <p className="text-purple-300 text-sm">{league.name}</p>
+                </div>
               </div>
+              <Link
+                href="/standings"
+                className="flex items-center gap-2 text-purple-200 hover:text-white"
+              >
+                <Home className="h-5 w-5" />
+                Back to App
+              </Link>
             </div>
-            <Link
-              href="/standings"
-              className="flex items-center gap-2 text-purple-200 hover:text-white"
-            >
-              <Home className="h-5 w-5" />
-              Back to App
-            </Link>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Admin Navigation */}
-      <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex gap-1 overflow-x-auto">
-            <NavLink href="/league/admin" icon={<Shield className="h-4 w-4" />}>
-              Dashboard
-            </NavLink>
-            <NavLink href="/league/admin/settings" icon={<Settings className="h-4 w-4" />}>
-              Settings
-            </NavLink>
-            <NavLink href="/league/admin/teams" icon={<Users className="h-4 w-4" />}>
-              Teams
-            </NavLink>
-            <NavLink href="/league/admin/invites" icon={<Mail className="h-4 w-4" />}>
-              Invites
-            </NavLink>
-            <NavLink href="/league/admin/movies" icon={<Film className="h-4 w-4" />}>
-              Movies
-            </NavLink>
-            <NavLink href="/league/admin/auctions" icon={<Gavel className="h-4 w-4" />}>
-              Auctions
-            </NavLink>
+        {/* Admin Navigation */}
+        <nav className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex gap-1 overflow-x-auto">
+              <NavLink href="/league/admin" icon={<Shield className="h-4 w-4" />}>
+                Dashboard
+              </NavLink>
+              <NavLink href="/league/admin/settings" icon={<Settings className="h-4 w-4" />}>
+                Settings
+              </NavLink>
+              <NavLink href="/league/admin/teams" icon={<Users className="h-4 w-4" />}>
+                Teams
+              </NavLink>
+              <NavLink href="/league/admin/invites" icon={<Mail className="h-4 w-4" />}>
+                Invites
+              </NavLink>
+              <NavLink href="/league/admin/movies" icon={<Film className="h-4 w-4" />}>
+                Movies
+              </NavLink>
+              <NavLink href="/league/admin/auctions" icon={<Gavel className="h-4 w-4" />}>
+                Auctions
+              </NavLink>
+            </div>
           </div>
-        </div>
-      </nav>
+        </nav>
 
-      {/* Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {children}
-      </main>
-    </div>
+        {/* Content */}
+        <main className="max-w-7xl mx-auto px-4 py-8">
+          {children}
+        </main>
+      </div>
+    </AdminProviders>
   );
 }
 
