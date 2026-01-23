@@ -579,13 +579,37 @@ export default function LeagueMoviesPage() {
   }
 
   async function refreshAllBoxOffice() {
-    const moviesToRefresh = movies.filter(m => m.tmdb_id);
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1; // 1-indexed
+
+    // Only refresh movies that have been released (release date in the past)
+    const moviesToRefresh = movies.filter(m => {
+      if (!m.tmdb_id) return false;
+      if (!m.release_year || !m.release_month) return false;
+
+      // Check if release date is in the past
+      if (m.release_year < currentYear) return true;
+      if (m.release_year === currentYear && m.release_month <= currentMonth) return true;
+      return false;
+    });
+
     if (moviesToRefresh.length === 0) {
-      alert('No movies with TMDB IDs to refresh');
+      alert('No released movies with TMDB IDs to refresh');
       return;
     }
 
-    if (!confirm(`Refresh all data (box office, theaters, metacritic) for ${moviesToRefresh.length} movies?\n\nThis processes each movie individually to avoid timeouts.`)) {
+    const unreleased = movies.filter(m => m.tmdb_id && m.release_year && m.release_month &&
+      (m.release_year > currentYear || (m.release_year === currentYear && m.release_month > currentMonth))
+    ).length;
+
+    let confirmMsg = `Refresh all data (box office, theaters, metacritic) for ${moviesToRefresh.length} released movies?`;
+    if (unreleased > 0) {
+      confirmMsg += `\n\n(${unreleased} unreleased movies will be skipped)`;
+    }
+    confirmMsg += '\n\nThis processes each movie individually to avoid timeouts.';
+
+    if (!confirm(confirmMsg)) {
       return;
     }
 
