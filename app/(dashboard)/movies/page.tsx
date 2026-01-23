@@ -30,10 +30,13 @@ export default async function MoviesPage({
   const currentTeam = await getCurrentTeam();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Build query for movies
+  // Build query for movies - only show released movies
+  const today = new Date().toISOString().split('T')[0];
   let query = supabase
     .from('movies')
     .select('*')
+    .not('release_date', 'is', null)
+    .lte('release_date', today)
     .order('calculated_score', { ascending: false });
 
   // Apply filters
