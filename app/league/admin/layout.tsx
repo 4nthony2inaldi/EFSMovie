@@ -26,15 +26,20 @@ export default async function LeagueAdminLayout({
 
   // Get league where user is commissioner
   // Use limit(1).maybeSingle() to handle users who are commissioners of multiple leagues
-  const { data: league } = await supabase
+  const { data: league, error } = await supabase
     .from('leagues')
     .select('id, name')
     .eq('commissioner_user_id', user.id)
     .limit(1)
     .maybeSingle();
 
+  // Debug logging
+  console.log('[Admin Layout] User ID:', user.id);
+  console.log('[Admin Layout] League query result:', { league, error });
+
   if (!league) {
     // Not a commissioner, redirect to standings
+    console.log('[Admin Layout] No league found, redirecting to standings');
     redirect('/standings');
   }
 
