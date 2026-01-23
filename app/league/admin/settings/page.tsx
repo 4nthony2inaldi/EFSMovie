@@ -57,11 +57,13 @@ export default function LeagueSettingsPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Use limit(1).maybeSingle() to handle users who are commissioners of multiple leagues
     const { data } = await supabase
       .from('leagues')
       .select('*')
       .eq('commissioner_user_id', user.id)
-      .single();
+      .limit(1)
+      .maybeSingle();
 
     if (data) {
       setLeague(data);

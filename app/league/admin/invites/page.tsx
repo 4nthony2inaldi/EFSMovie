@@ -35,11 +35,13 @@ export default function LeagueInvitesPage() {
     if (!user) return;
 
     // Get commissioner's league
+    // Use limit(1).maybeSingle() to handle users who are commissioners of multiple leagues
     const { data: league } = await supabase
       .from('leagues')
       .select('id')
       .eq('commissioner_user_id', user.id)
-      .single();
+      .limit(1)
+      .maybeSingle();
 
     if (!league) return;
     setLeagueId(league.id);

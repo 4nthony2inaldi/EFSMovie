@@ -25,11 +25,13 @@ export default async function LeagueAdminLayout({
   }
 
   // Get league where user is commissioner
+  // Use limit(1).maybeSingle() to handle users who are commissioners of multiple leagues
   const { data: league } = await supabase
     .from('leagues')
     .select('id, name')
     .eq('commissioner_user_id', user.id)
-    .single();
+    .limit(1)
+    .maybeSingle();
 
   if (!league) {
     // Not a commissioner, redirect to standings
