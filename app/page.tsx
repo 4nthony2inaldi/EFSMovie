@@ -106,9 +106,9 @@ export default async function Home() {
               <div>
                 <h3 className="text-lg font-semibold text-gold-400 mb-3">Base Score Formula</h3>
                 <div className="bg-purple-900/50 rounded-lg p-4 font-mono text-sm text-purple-100">
-                  <p>Box Office Component = min(15, ($/theaters)/1000)</p>
-                  <p className="mt-2">Base Score = Box Office Component × Metacritic</p>
-                  <p className="mt-2">Floor Rule: If Base &lt; Metacritic, use Metacritic</p>
+                  <p>[Box Office per Theater] × [Rating] ÷ 1000</p>
+                  <p className="mt-2 text-purple-300 text-xs">• BO/Theater capped at $15k • Requires 5+ theaters</p>
+                  <p className="mt-2 text-purple-300 text-xs">• Until BO/Theater surpasses rating, score = rating alone</p>
                 </div>
               </div>
               <div>

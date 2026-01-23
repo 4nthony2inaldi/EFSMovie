@@ -14,10 +14,10 @@ export interface MovieStats {
  * Calculate the full score breakdown for a movie
  *
  * Formula:
- * - Box Office Component = min(15, (Domestic Box Office / Theater Count) / 1000)
- * - Must be in 5+ theaters to earn box office points
- * - Base Score = Box Office Component × Metacritic Score
- * - Floor Rule: If Base Score < Metacritic, use Metacritic as minimum
+ * - Base Score = [Box Office per Theater] × [Rating] ÷ 1000
+ * - BO/Theater capped at $15k
+ * - Requires 5+ theaters to earn box office points
+ * - Floor Rule: Until BO/Theater surpasses rating, score = rating alone
  * - Oscar Points: +0.5 per nom, +1.0 per win
  * - Best Picture nom: doubled (+1.0 total instead of +0.5)
  * - Best Picture win: doubled (+2.0 total instead of +1.0)
