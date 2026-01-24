@@ -57,6 +57,7 @@ export interface Movie {
   domestic_box_office: number;
   theater_count: number;
   metacritic_score: number | null;
+  metacritic_source: 'metacritic' | 'user' | 'placeholder' | null;
   rotten_tomatoes_score: number | null;
   oscar_nominations: number;
   oscar_wins: number;

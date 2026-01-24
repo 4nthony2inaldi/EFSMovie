@@ -7,7 +7,15 @@ import { getScoreTier, MONTH_NAMES } from '@/types';
 import type { Movie, ReleaseType } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { WatchlistButton } from '@/components/movies/watchlist-button';
-import { Film, Calendar, Star, TrendingUp, Rocket } from 'lucide-react';
+import { Film, Calendar, Star, Building2 } from 'lucide-react';
+
+// Format theater count compactly (e.g., "3.5K")
+function formatTheaters(count: number): string {
+  if (count >= 1000) {
+    return `${(count / 1000).toFixed(1)}K`;
+  }
+  return count.toString();
+}
 
 const RELEASE_TYPE_CONFIG: Record<ReleaseType, { label: string; className: string }> = {
   wide: { label: 'Wide', className: 'text-green-600' },
@@ -42,10 +50,26 @@ export function MovieCard({ movie, ownerName, showOwner = true, isOnWatchlist = 
   const rawBaseScore = boxOfficeComponent * metacritic;
   const beatFloor = metacritic > 0 && rawBaseScore >= metacritic;
 
+  // Check if critic score is from metacritic or a fallback
+  const isRealMetacritic = movie.metacritic_source === 'metacritic';
+  const isUserScore = movie.metacritic_source === 'user';
+  const isPlaceholder = movie.metacritic_source === 'placeholder' || (!movie.metacritic_source && movie.metacritic_score);
+
+  // Determine card background style
+  // Gold tint = hit box office cap, Grey = hasn't beat floor yet
+  const cardBgClass = isMaxedPerTheater
+    ? 'bg-gradient-to-r from-gold-50 to-white border-gold-200'
+    : !beatFloor && metacritic > 0
+    ? 'bg-gray-50 border-gray-200'
+    : 'bg-white border-gray-200';
+
   return (
     <Link
       href={`/movies/${movie.id}`}
-      className="block w-full max-w-full bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1"
+      className={cn(
+        "block w-full max-w-full rounded-xl border overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1",
+        cardBgClass
+      )}
     >
       <div className="flex w-full">
         {/* Poster */}
@@ -94,29 +118,43 @@ export function MovieCard({ movie, ownerName, showOwner = true, isOnWatchlist = 
             </div>
           )}
 
-          {/* Stats */}
+          {/* Stats: money → theaters → critic */}
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
             {movie.domestic_box_office > 0 && (
               <span className="text-gray-600">
                 {formatBoxOffice(movie.domestic_box_office)}
               </span>
             )}
+            {theaterCount > 0 && (
+              <>
+                {movie.domestic_box_office > 0 && <span className="text-gray-400">→</span>}
+                <span className="flex items-center gap-0.5 text-gray-600">
+                  <Building2 className="h-3 w-3" />
+                  {formatTheaters(theaterCount)}
+                </span>
+              </>
+            )}
             {movie.metacritic_score && (
-              <span className="flex items-center gap-0.5 text-gray-600">
-                <Star className="h-3 w-3 text-gold-500" />
-                {formatMetacritic(movie.metacritic_score)}
-              </span>
-            )}
-            {/* Achievement indicators */}
-            {isMaxedPerTheater && (
-              <span className="flex items-center gap-0.5 text-green-600" title="Maxed $15k/theater">
-                <TrendingUp className="h-3.5 w-3.5" />
-              </span>
-            )}
-            {beatFloor && (
-              <span className="flex items-center gap-0.5 text-purple-600" title="Beat critic floor">
-                <Rocket className="h-3.5 w-3.5" />
-              </span>
+              <>
+                {(movie.domestic_box_office > 0 || theaterCount > 0) && <span className="text-gray-400">→</span>}
+                <span
+                  className={cn(
+                    "flex items-center gap-0.5",
+                    isRealMetacritic ? "text-gray-600" : "text-yellow-600"
+                  )}
+                  title={
+                    isRealMetacritic
+                      ? "Metacritic score"
+                      : isUserScore
+                      ? "User score (no critic reviews yet)"
+                      : "Placeholder score (awaiting reviews)"
+                  }
+                >
+                  <Star className="h-3 w-3 text-gold-500" />
+                  {formatMetacritic(movie.metacritic_score)}
+                  {!isRealMetacritic && <span className="text-yellow-600">*</span>}
+                </span>
+              </>
             )}
             {/* Watchlist button */}
             {showWatchlistButton && (
