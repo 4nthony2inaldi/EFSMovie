@@ -116,12 +116,16 @@ export async function POST(request: NextRequest) {
     // Get Metacritic score - try OMDB first, fall back to scraping Metacritic
     let metacriticScore: number | null = null;
     let metacriticSource: 'metacritic' | 'user' | 'placeholder' | null = null;
+    let omdbHadScore = false;
+    let omdbRawScore: number | null = null;
 
     if (imdbId) {
       // Try OMDB first (most reliable when available)
       try {
         const ratings = await getMovieRatings(imdbId);
+        omdbRawScore = ratings.metacritic;
         if (ratings.metacritic !== null) {
+          omdbHadScore = true;
           metacriticScore = ratings.metacritic;
           metacriticSource = 'metacritic';
           console.log(`Got Metacritic score from OMDB: ${metacriticScore}`);
@@ -230,8 +234,9 @@ export async function POST(request: NextRequest) {
         title,
         metacriticScore,
         metacriticSource,
-        omdbHadScore: false, // Will be true if OMDB provided the score
-        scraperCalled: metacriticScore !== null && metacriticSource !== 'placeholder',
+        omdbHadScore,
+        omdbRawScore,
+        scraperCalled: !omdbHadScore && metacriticScore !== null && metacriticSource !== 'placeholder',
       },
       data: {
         ...data,
