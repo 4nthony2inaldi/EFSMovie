@@ -101,6 +101,10 @@ export async function POST(request: NextRequest) {
 
     if (metacriticScore !== null) {
       updateData.metacritic_score = metacriticScore;
+    } else {
+      // Explicitly clear metacritic_score if we couldn't find a valid score
+      // This fixes movies with incorrect scores (e.g., false 100%)
+      updateData.metacritic_score = null;
     }
 
     // Update the movie in the database
@@ -233,6 +237,9 @@ export async function PUT(request: NextRequest) {
 
         if (metacriticScore !== null) {
           updateData.metacritic_score = metacriticScore;
+        } else {
+          // Explicitly clear metacritic_score if we couldn't find a valid score
+          updateData.metacritic_score = null;
         }
 
         await supabase
