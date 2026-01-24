@@ -268,17 +268,22 @@ async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Pr
         if (rating && rating.ratingValue !== undefined) {
           const bestRating = rating.bestRating;
           const ratingValue = parseFloat(rating.ratingValue);
+          const ratingCount = rating.ratingCount || rating.reviewCount || 0;
 
           // Critic score uses 0-100 scale (bestRating: 100)
-          if (bestRating === 100 && ratingValue >= 1 && ratingValue <= 99) {
-            console.log(`Found Metascore ${ratingValue} via JSON-LD parsing for ${title}`);
+          // Must have ratingCount > 0 to be a real Metascore (not a "must-see" or placeholder score)
+          if (bestRating === 100 && ratingValue >= 1 && ratingValue <= 99 && ratingCount > 0) {
+            console.log(`Found Metascore ${ratingValue} (${ratingCount} reviews) via JSON-LD parsing for ${title}`);
             return { score: ratingValue / 100, source: 'metacritic' };
+          } else if (bestRating === 100 && ratingValue >= 1 && ratingValue <= 99) {
+            console.log(`Ignoring score ${ratingValue} with 0 reviews (likely must-see or placeholder) for ${title}`);
           }
 
           // User score uses 0-10 scale (bestRating: 10)
-          if (bestRating === 10 && ratingValue >= 0 && ratingValue <= 10) {
+          // Also require ratingCount > 0 for user scores
+          if (bestRating === 10 && ratingValue >= 0 && ratingValue <= 10 && ratingCount > 0) {
             const convertedScore = Math.round(ratingValue * 10);
-            console.log(`Found user score ${ratingValue} (${convertedScore}%) via JSON-LD parsing for ${title}`);
+            console.log(`Found user score ${ratingValue} (${convertedScore}%, ${ratingCount} ratings) via JSON-LD parsing for ${title}`);
             return { score: convertedScore / 100, source: 'user' };
           }
         }
