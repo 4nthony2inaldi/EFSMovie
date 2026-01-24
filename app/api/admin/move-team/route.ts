@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -9,6 +10,9 @@ export async function POST(request: NextRequest) {
   if (!user || user.id !== process.env.ADMIN_USER_ID) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  // Use admin client to bypass RLS for the actual operations
+  const adminSupabase = createAdminClient();
 
   try {
     const { teamId, targetLeagueId } = await request.json();
@@ -21,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify team exists
-    const { data: team, error: teamError } = await supabase
+    const { data: team, error: teamError } = await adminSupabase
       .from('teams')
       .select('id, name, league_id, user_id')
       .eq('id', teamId)
@@ -35,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify target league exists
-    const { data: targetLeague, error: leagueError } = await supabase
+    const { data: targetLeague, error: leagueError } = await adminSupabase
       .from('leagues')
       .select('id, name')
       .eq('id', targetLeagueId)
@@ -57,7 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already has a team in the target league
-    const { data: existingTeam } = await supabase
+    const { data: existingTeam } = await adminSupabase
       .from('teams')
       .select('id')
       .eq('user_id', team.user_id)
@@ -72,7 +76,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Move the team to the new league
-    const { error: updateError } = await supabase
+    const { error: updateError } = await adminSupabase
       .from('teams')
       .update({ league_id: targetLeagueId })
       .eq('id', teamId);
