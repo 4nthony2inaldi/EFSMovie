@@ -625,8 +625,17 @@ export default function LeagueMoviesPage() {
         alert(`Failed to refresh ${movie.title}: ${data.error}`);
       } else {
         await loadMovies();
-        if (useBrowser && data.data?.theater_count) {
-          alert(`Got theater count: ${data.data.theater_count.toLocaleString()} theaters`);
+        // Show debug info so we can diagnose metacritic issues
+        if (useBrowser && data.debug) {
+          const debugInfo = [
+            `Title: ${data.debug.title}`,
+            `MC Score: ${data.debug.metacriticScore}`,
+            `MC Source: ${data.debug.metacriticSource}`,
+            `OMDB had score: ${data.debug.omdbHadScore}`,
+            `Scraper called: ${data.debug.scraperCalled}`,
+            `Theaters: ${data.data?.theater_count || 'none'}`,
+          ].join('\n');
+          alert(`Refresh result:\n${debugInfo}`);
         }
       }
     } catch (error) {
