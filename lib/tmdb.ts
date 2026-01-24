@@ -130,17 +130,19 @@ class TMDBClient {
   ): Promise<TMDBResponse<TMDBMovie>> {
     const params: Record<string, string> = {
       page: page.toString(),
-      'primary_release_date.gte': startDate,
-      'primary_release_date.lte': endDate,
       sort_by: 'popularity.desc',
       'vote_count.gte': (options.minVoteCount ?? 0).toString(),
       with_original_language: 'en',
+      // Always filter to US releases so we get movies by their US release date,
+      // not their worldwide premiere date (which may be in a different month/year)
+      region: 'US',
+      'release_date.gte': startDate,
+      'release_date.lte': endDate,
     };
 
-    // Only restrict to theatrical for past/current releases
+    // For past/current releases, also restrict to theatrical release types
     if (options.restrictReleaseType) {
       params.with_release_type = '2|3';
-      params.region = 'US';
     }
 
     // Exclude Documentary (99) and TV Movie (10770) genres
