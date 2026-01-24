@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { scrapeBoxOfficeData, searchBoxOfficeMojo, scrapeMetacriticScore } from '@/lib/boxofficemojo';
 import { tmdb } from '@/lib/tmdb';
+import { getMovieRatings } from '@/lib/api/omdb';
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
@@ -51,8 +52,20 @@ export async function POST(request: NextRequest) {
     // Scrape Box Office Mojo
     const boxOfficeData = await scrapeBoxOfficeData(imdbId);
 
-    // Scrape Metacritic score
-    const metacriticScore = await scrapeMetacriticScore(title, releaseYear);
+    // Get Metacritic score - try OMDB API first, then fallback to scraping
+    let metacriticScore: number | null = null;
+    try {
+      const omdbRatings = await getMovieRatings(imdbId);
+      metacriticScore = omdbRatings.metacritic;
+      console.log(`OMDB Metacritic for ${title}: ${metacriticScore}`);
+    } catch (omdbError) {
+      console.log(`OMDB failed for ${title}, trying scrape fallback:`, omdbError);
+    }
+
+    // Fallback to scraping IMDB if OMDB didn't have data
+    if (metacriticScore === null) {
+      metacriticScore = await scrapeMetacriticScore(imdbId, title, releaseYear);
+    }
 
     if (!boxOfficeData && !metacriticScore) {
       return NextResponse.json({
@@ -172,7 +185,21 @@ export async function PUT(request: NextRequest) {
         }
 
         const boxOfficeData = await scrapeBoxOfficeData(imdbId);
-        const metacriticScore = await scrapeMetacriticScore(movie.title, movie.release_year);
+
+        // Get Metacritic score - try OMDB API first, then fallback to scraping
+        let metacriticScore: number | null = null;
+        try {
+          const omdbRatings = await getMovieRatings(imdbId);
+          metacriticScore = omdbRatings.metacritic;
+          console.log(`OMDB Metacritic for ${movie.title}: ${metacriticScore}`);
+        } catch (omdbError) {
+          console.log(`OMDB failed for ${movie.title}, trying scrape fallback`);
+        }
+
+        // Fallback to scraping IMDB if OMDB didn't have data
+        if (metacriticScore === null) {
+          metacriticScore = await scrapeMetacriticScore(imdbId, movie.title, movie.release_year);
+        }
 
         if (!boxOfficeData && metacriticScore === null) {
           results.failed++;
