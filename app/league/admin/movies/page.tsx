@@ -376,13 +376,37 @@ export default function LeagueMoviesPage() {
   }
 
   async function handleDeleteAll() {
-    const count = movies.length;
-    if (!confirm(`Are you sure you want to delete ALL ${count} movies? This cannot be undone.`)) return;
+    // Use filtered movies (respects month, search, and studio filters)
+    const moviesToDelete = filteredMovies;
+    const count = moviesToDelete.length;
+
+    if (count === 0) {
+      alert('No movies to delete with current filters');
+      return;
+    }
+
+    // Build a descriptive message based on active filters
+    const filterDescriptions: string[] = [];
+    if (filterMonth !== '') {
+      filterDescriptions.push(MONTHS[filterMonth - 1]);
+    }
+    if (filterStudio) {
+      filterDescriptions.push(`studio: ${filterStudio}`);
+    }
+    if (search) {
+      filterDescriptions.push(`matching "${search}"`);
+    }
+
+    const filterText = filterDescriptions.length > 0
+      ? ` (${filterDescriptions.join(', ')})`
+      : ' (ALL movies)';
+
+    if (!confirm(`Are you sure you want to delete ${count} movies${filterText}? This cannot be undone.`)) return;
 
     setBulkDeleting(true);
 
-    // Delete all movies by their IDs
-    const movieIds = movies.map(m => m.id);
+    // Delete only the filtered movies by their IDs
+    const movieIds = moviesToDelete.map(m => m.id);
     const { error } = await supabase
       .from('movies')
       .delete()
