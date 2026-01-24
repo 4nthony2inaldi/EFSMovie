@@ -20,6 +20,7 @@ interface Movie {
   domestic_box_office: number;
   theater_count: number | null;
   metacritic_score: number | null;
+  metacritic_source?: 'metacritic' | 'user' | 'placeholder' | null;
   calculated_score: number;
   tmdb_id?: number;
   imdb_id?: string;
@@ -1444,10 +1445,15 @@ export default function LeagueMoviesPage() {
                         }
                       </td>
                       <td className="p-2 text-right text-xs">
-                        {movie.metacritic_score
-                          ? `${Math.round(movie.metacritic_score * 100)}`
-                          : <span className="text-gray-400">-</span>
-                        }
+                        {movie.metacritic_score ? (
+                          <span className={movie.metacritic_source && movie.metacritic_source !== 'metacritic' ? 'text-yellow-600' : ''}>
+                            {Math.round(movie.metacritic_score * 100)}
+                            {movie.metacritic_source === 'user' && <span title="User score - waiting for official MC">*</span>}
+                            {movie.metacritic_source === 'placeholder' && <span title="Placeholder - waiting for official MC">†</span>}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="p-2 text-right">
                         <span className={`text-xs font-medium ${movie.calculated_score > 0 ? 'text-green-600' : 'text-gray-400'}`}>

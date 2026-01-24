@@ -192,10 +192,18 @@ function toMetacriticSlug(title: string): string {
 }
 
 /**
- * Scrape Metacritic score directly from Metacritic website
- * Returns score as decimal (0-1), e.g., 81 -> 0.81
+ * Result from Metacritic scraping
  */
-export async function scrapeMetacriticScore(imdbId: string, title: string, year?: number): Promise<number | null> {
+export interface MetacriticResult {
+  score: number | null;  // Score as decimal (0-1)
+  source: 'metacritic' | 'user' | null;  // Where the score came from
+}
+
+/**
+ * Scrape Metacritic score directly from Metacritic website
+ * Returns score as decimal (0-1) and the source (metacritic critic score or user score)
+ */
+export async function scrapeMetacriticScore(imdbId: string, title: string, year?: number): Promise<MetacriticResult> {
   const slug = toMetacriticSlug(title);
 
   // Build list of URLs to try - Metacritic sometimes appends the year to the slug
@@ -212,20 +220,20 @@ export async function scrapeMetacriticScore(imdbId: string, title: string, year?
 
   for (const metacriticUrl of urlsToTry) {
     console.log(`Trying Metacritic URL: ${metacriticUrl}`);
-    const score = await tryFetchMetacriticScore(metacriticUrl, title);
-    if (score !== null) {
-      return score;
+    const result = await tryFetchMetacriticScore(metacriticUrl, title);
+    if (result.score !== null) {
+      return result;
     }
   }
 
-  console.log(`No valid Metascore found on Metacritic for ${title} (tried ${urlsToTry.length} URLs)`);
-  return null;
+  console.log(`No valid score found on Metacritic for ${title} (tried ${urlsToTry.length} URLs)`);
+  return { score: null, source: null };
 }
 
 /**
  * Try to fetch and parse Metacritic score from a specific URL
  */
-async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Promise<number | null> {
+async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Promise<MetacriticResult> {
 
   try {
     const response = await fetch(metacriticUrl, {
@@ -240,22 +248,15 @@ async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Pr
     // If 404 or other error, this URL doesn't work - try next one
     if (!response.ok) {
       console.log(`Metacritic fetch failed: ${response.status} for ${metacriticUrl}`);
-      return null;
+      return { score: null, source: null };
     }
 
     const html = await response.text();
     console.log(`Metacritic HTML length: ${html.length} bytes for ${metacriticUrl}`);
 
-    // First, check if there's actually a Metascore on the page
-    // Metacritic shows "tbd" or doesn't show a score if there aren't enough reviews
-    if (html.includes('>tbd<') || html.includes('data-metascore="tbd"')) {
-      console.log(`Metacritic shows TBD for ${title} - not enough reviews`);
-      return null;
-    }
-
-    // Look for Metascore specifically (not user score)
+    // Look for Metascore (critic score) first
     // The Metascore JSON-LD has a specific structure with "worstRating":0,"bestRating":100
-    const scorePatterns = [
+    const metascorePatterns = [
       // JSON-LD Metascore format - must have bestRating of 100 (critic score, not user 0-10)
       /"ratingValue"\s*:\s*"?(\d+)"?\s*,\s*"worstRating"\s*:\s*0\s*,\s*"bestRating"\s*:\s*100/i,
       // Alternative order
@@ -268,28 +269,52 @@ async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Pr
       /Metascore[^<]*<[^>]*>(\d+)</i,
     ];
 
-    for (const pattern of scorePatterns) {
+    for (const pattern of metascorePatterns) {
       const match = html.match(pattern);
       if (match) {
         const score = parseInt(match[1], 10);
         // Valid Metascores are typically 20-99; 100 is extremely rare and often indicates an error
-        // Also reject very low scores that might be user ratings on 0-10 scale
         if (score >= 20 && score <= 99) {
-          console.log(`Scraped Metacritic ${score} from ${metacriticUrl} for ${title}`);
-          return score / 100;
+          console.log(`Scraped Metacritic critic score ${score} from ${metacriticUrl} for ${title}`);
+          return { score: score / 100, source: 'metacritic' };
         } else if (score === 100) {
-          // Log but don't immediately return - check if there are other matches
           console.log(`Found score of 100 for ${title} - likely an error, continuing search`);
         }
       }
     }
 
-    // Page loaded but no score found
-    console.log(`Page loaded but no valid Metascore pattern matched for ${title}`);
-    return null;
+    // No Metascore found - try to get User Score as fallback
+    // User scores are on a 0-10 scale (like 7.6), we need to convert to 0-100
+    const userScorePatterns = [
+      // JSON-LD user score format - bestRating of 10
+      /"ratingValue"\s*:\s*"?([\d.]+)"?\s*,\s*"worstRating"\s*:\s*0\s*,\s*"bestRating"\s*:\s*10[^0]/i,
+      /"worstRating"\s*:\s*0\s*,\s*"bestRating"\s*:\s*10[^0][^}]*"ratingValue"\s*:\s*"?([\d.]+)"?/i,
+      // User score display patterns
+      /USER\s*SCORE[^>]*>[^<]*<[^>]*>([\d.]+)/i,
+      /c-siteReviewScore[^"]*user[^>]*>([\d.]+)</i,
+      /data-userscore="([\d.]+)"/i,
+    ];
+
+    for (const pattern of userScorePatterns) {
+      const match = html.match(pattern);
+      if (match) {
+        const userScore = parseFloat(match[1]);
+        // Valid user scores are 0-10
+        if (userScore >= 0 && userScore <= 10) {
+          // Convert to 0-100 scale (6.2 -> 62)
+          const convertedScore = Math.round(userScore * 10);
+          console.log(`Scraped Metacritic user score ${userScore} (${convertedScore}%) from ${metacriticUrl} for ${title}`);
+          return { score: convertedScore / 100, source: 'user' };
+        }
+      }
+    }
+
+    // Page loaded but no score found (tbd or not enough reviews)
+    console.log(`Page loaded but no valid score found for ${title}`);
+    return { score: null, source: null };
   } catch (error) {
     console.error(`Error fetching ${metacriticUrl}:`, error);
-    return null;
+    return { score: null, source: null };
   }
 }
 
