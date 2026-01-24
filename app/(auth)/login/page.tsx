@@ -33,13 +33,14 @@ export default function LoginPage() {
     // Check if user has a team (completed onboarding)
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      const { data: team } = await supabase
+      // Use .limit(1) instead of .single() to avoid errors when user has multiple teams
+      const { data: teams } = await supabase
         .from('teams')
         .select('id')
         .eq('user_id', user.id)
-        .single();
+        .limit(1);
 
-      if (!team) {
+      if (!teams || teams.length === 0) {
         // No team yet, need to complete onboarding
         router.push('/onboarding');
         router.refresh();

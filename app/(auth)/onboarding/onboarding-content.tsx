@@ -47,13 +47,14 @@ export function OnboardingContent() {
       }
 
       // Check if user already has a team
-      const { data: existingTeam } = await supabase
+      // Use .limit(1) instead of .single() to avoid errors when user has multiple teams
+      const { data: existingTeams } = await supabase
         .from('teams')
         .select('id')
         .eq('user_id', user.id)
-        .single();
+        .limit(1);
 
-      if (existingTeam) {
+      if (existingTeams && existingTeams.length > 0) {
         // Already onboarded, go to standings
         router.push('/standings');
         return;
