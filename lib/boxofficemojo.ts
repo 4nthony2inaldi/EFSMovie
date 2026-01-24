@@ -206,34 +206,45 @@ export async function scrapeMetacriticScore(imdbId: string, title: string, year?
     const html = await response.text();
     console.log(`Metacritic HTML length: ${html.length} bytes`);
 
-    // Look for Metascore on Metacritic page
+    // First, check if there's actually a Metascore on the page
+    // Metacritic shows "tbd" or doesn't show a score if there aren't enough reviews
+    if (html.includes('>tbd<') || html.includes('data-metascore="tbd"')) {
+      console.log(`Metacritic shows TBD for ${title} - not enough reviews`);
+      return null;
+    }
+
+    // Look for Metascore specifically (not user score)
+    // The Metascore JSON-LD has a specific structure with "worstRating":0,"bestRating":100
     const scorePatterns = [
-      // JSON-LD format: "ratingValue":"80"
-      /"ratingValue"\s*:\s*"?(\d+)"?/i,
-      // Metacritic score display patterns
-      /data-v-\w+[^>]*>(\d+)<\/span>[^<]*<\/div>[^<]*Metascore/i,
-      /metascore[^>]*>(\d+)/i,
-      /class="[^"]*score[^"]*"[^>]*>(\d+)</i,
-      /data-score="(\d+)"/i,
-      // Score in title or header
-      /Metascore[:\s]*(\d+)/i,
-      // Generic score pattern near "metascore" or "score"
+      // JSON-LD Metascore format - must have bestRating of 100 (critic score, not user 0-10)
+      /"ratingValue"\s*:\s*"?(\d+)"?\s*,\s*"worstRating"\s*:\s*0\s*,\s*"bestRating"\s*:\s*100/i,
+      // Alternative order
+      /"worstRating"\s*:\s*0\s*,\s*"bestRating"\s*:\s*100[^}]*"ratingValue"\s*:\s*"?(\d+)"?/i,
+      // Metascore display class patterns
+      /c-siteReviewScore_[^"]*metascore[^>]*>(\d+)</i,
+      /data-metascore="(\d+)"/i,
+      // Score element with Metascore label nearby
       />(\d+)<\/span>\s*<\/a>\s*<span[^>]*>Metascore/i,
-      /c-siteReviewScore[^>]*>(\d+)</i,
+      /Metascore[^<]*<[^>]*>(\d+)</i,
     ];
 
     for (const pattern of scorePatterns) {
       const match = html.match(pattern);
       if (match) {
         const score = parseInt(match[1], 10);
-        if (score >= 0 && score <= 100) {
+        // Valid Metascores are typically 20-99; 100 is extremely rare and often indicates an error
+        // Also reject very low scores that might be user ratings on 0-10 scale
+        if (score >= 20 && score <= 99) {
           console.log(`Scraped Metacritic ${score} from Metacritic.com for ${title}`);
           return score / 100;
+        } else if (score === 100) {
+          // Log but don't immediately return - check if there are other matches
+          console.log(`Found score of 100 for ${title} - likely an error, continuing search`);
         }
       }
     }
 
-    console.log(`No score found on Metacritic for ${title}`);
+    console.log(`No valid Metascore found on Metacritic for ${title}`);
     return null;
   } catch (error) {
     console.error(`Error scraping Metacritic for ${title}:`, error);
