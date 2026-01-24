@@ -15,7 +15,16 @@ interface Team {
   league: {
     id: string;
     name: string;
-  };
+  } | null;
+}
+
+interface RawTeam {
+  id: string;
+  name: string;
+  user_id: string;
+  league_id: string;
+  created_at: string;
+  league: { id: string; name: string }[] | { id: string; name: string } | null;
 }
 
 interface League {
@@ -61,7 +70,12 @@ export default function AdminTeamsPage() {
         .order('name'),
     ]);
 
-    setTeams((teamsResult.data as Team[]) || []);
+    // Transform the data - league comes back as array from Supabase join
+    const transformedTeams: Team[] = ((teamsResult.data as RawTeam[]) || []).map(team => ({
+      ...team,
+      league: Array.isArray(team.league) ? team.league[0] || null : team.league,
+    }));
+    setTeams(transformedTeams);
     setLeagues(leaguesResult.data || []);
     setLoading(false);
   }
