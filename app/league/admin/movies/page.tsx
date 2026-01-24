@@ -200,12 +200,24 @@ export default function LeagueMoviesPage() {
     }
   }, [oscarStudiosOnly, majorStudiosOnly, tmdbMovies]);
 
-  // Get TMDB movies with top 50 filter applied (movies are already sorted by popularity)
+  // Get TMDB movies with filters applied (movies are already sorted by popularity)
   function getFilteredTmdbMovies(): TMDBMovie[] {
+    let filtered = tmdbMovies;
+
+    // Filter out movies where the displayed release date doesn't match the selected month
+    // This excludes re-releases that show their original release date
+    filtered = filtered.filter(movie => {
+      if (!movie.release_date) return false;
+      const releaseDate = new Date(movie.release_date);
+      const movieMonth = releaseDate.getMonth() + 1;
+      const movieYear = releaseDate.getFullYear();
+      return movieMonth === tmdbMonth && movieYear === tmdbYear;
+    });
+
     if (limitToTop50) {
-      return tmdbMovies.slice(0, 50);
+      return filtered.slice(0, 50);
     }
-    return tmdbMovies;
+    return filtered;
   }
 
   // Calculate filtered movie count based on all filters
