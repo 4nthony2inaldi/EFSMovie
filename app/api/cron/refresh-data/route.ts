@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { scrapeBoxOfficeMojoBrowser } from '@/lib/scraper-browser';
-import { scrapeMetacriticScore } from '@/lib/boxofficemojo';
+import { scrapeMetacriticScore, MetacriticResult } from '@/lib/boxofficemojo';
 import { getMovieRatings } from '@/lib/api/omdb';
 import { tmdb } from '@/lib/tmdb';
 import type { ReleaseType } from '@/types';
@@ -118,17 +118,36 @@ export async function GET(request: NextRequest) {
           movie.release_month
         );
 
-        // Get Metacritic score - try OMDB first, fall back to IMDB scrape
+        // Get Metacritic score - try OMDB first, fall back to scraping Metacritic
         let metacriticScore: number | null = null;
+        let metacriticSource: 'metacritic' | 'user' | 'placeholder' | null = null;
+
         try {
           const ratings = await getMovieRatings(imdbId);
-          metacriticScore = ratings.metacritic;
+          if (ratings.metacritic !== null) {
+            metacriticScore = ratings.metacritic;
+            metacriticSource = 'metacritic';
+          }
         } catch (e) {
-          // OMDB failed, will try IMDB scrape below
+          // OMDB failed, will try Metacritic scrape below
         }
 
-        if (!metacriticScore) {
-          metacriticScore = await scrapeMetacriticScore(imdbId, movie.title, movie.release_year);
+        if (metacriticScore === null) {
+          const scrapeResult: MetacriticResult = await scrapeMetacriticScore(imdbId, movie.title, movie.release_year);
+          if (scrapeResult.score !== null) {
+            metacriticScore = scrapeResult.score;
+            metacriticSource = scrapeResult.source;
+          }
+        }
+
+        // If still no score but we have both box office and theaters, use 50% placeholder
+        const hasBothBoxOfficeData = boxOfficeData &&
+          boxOfficeData.domestic_box_office > 0 &&
+          (boxOfficeData.theater_count > 0 || boxOfficeData.widest_release);
+
+        if (metacriticScore === null && hasBothBoxOfficeData) {
+          metacriticScore = 0.50; // 50%
+          metacriticSource = 'placeholder';
         }
 
         // Determine release type
@@ -169,6 +188,11 @@ export async function GET(request: NextRequest) {
 
         if (metacriticScore !== null) {
           updateData.metacritic_score = metacriticScore;
+          updateData.metacritic_source = metacriticSource;
+        } else {
+          // Explicitly clear metacritic_score if we couldn't find a valid score
+          updateData.metacritic_score = null;
+          updateData.metacritic_source = null;
         }
 
         await supabase
@@ -178,7 +202,7 @@ export async function GET(request: NextRequest) {
 
         results.updated++;
         results.movies.push(movie.title);
-        console.log(`Refreshed ${movie.title}: bo=${boxOfficeData?.domestic_box_office}, theaters=${boxOfficeData?.theater_count}, mc=${metacriticScore}`);
+        console.log(`Refreshed ${movie.title}: bo=${boxOfficeData?.domestic_box_office}, theaters=${boxOfficeData?.theater_count}, mc=${metacriticScore}, source=${metacriticSource}`);
 
         // Rate limit: wait 1.5 seconds between requests
         await new Promise(resolve => setTimeout(resolve, 1500));
