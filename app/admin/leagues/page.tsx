@@ -93,33 +93,35 @@ export default function AdminLeaguesPage() {
         ) : (
           filteredLeagues.map((league) => (
             <Card key={league.id}>
-              <CardHeader
-                className="cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() =>
-                  setExpandedLeagueId(expandedLeagueId === league.id ? null : league.id)
-                }
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Trophy className="h-6 w-6 text-purple-600" />
-                    <div>
-                      <CardTitle className="text-lg">{league.name}</CardTitle>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="gray">{league.season_year}</Badge>
-                        {league.slug && (
-                          <Badge variant="default">ID: {league.slug}</Badge>
-                        )}
-                        <span className="text-sm text-gray-500">
-                          {league.teams?.length || 0} teams
-                        </span>
+              <CardHeader>
+                <div
+                  className="cursor-pointer hover:bg-gray-50 -m-4 p-4 rounded-t-lg transition-colors"
+                  onClick={() =>
+                    setExpandedLeagueId(expandedLeagueId === league.id ? null : league.id)
+                  }
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Trophy className="h-6 w-6 text-purple-600" />
+                      <div>
+                        <CardTitle className="text-lg">{league.name}</CardTitle>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="gray">{league.season_year}</Badge>
+                          {league.slug && (
+                            <Badge variant="default">ID: {league.slug}</Badge>
+                          )}
+                          <span className="text-sm text-gray-500">
+                            {league.teams?.length || 0} teams
+                          </span>
+                        </div>
                       </div>
                     </div>
+                    {expandedLeagueId === league.id ? (
+                      <ChevronUp className="h-5 w-5 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-gray-400" />
+                    )}
                   </div>
-                  {expandedLeagueId === league.id ? (
-                    <ChevronUp className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5 text-gray-400" />
-                  )}
                 </div>
               </CardHeader>
               {expandedLeagueId === league.id && (
