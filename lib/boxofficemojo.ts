@@ -255,7 +255,8 @@ async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Pr
     console.log(`Metacritic HTML length: ${html.length} bytes for ${metacriticUrl}`);
 
     // Try to parse JSON-LD blocks to find aggregateRating
-    const jsonLdMatches = html.matchAll(/<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+    const jsonLdRegex = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+    const jsonLdMatches = Array.from(html.matchAll(jsonLdRegex));
 
     for (const jsonLdMatch of jsonLdMatches) {
       try {
