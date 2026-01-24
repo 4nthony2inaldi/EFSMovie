@@ -204,6 +204,37 @@ export default async function MovieDetailPage({
             </CardContent>
           </Card>
 
+          {/* Stats Card - shown on mobile before score breakdown */}
+          <Card className="lg:hidden">
+            <CardHeader>
+              <CardTitle>Stats</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <StatRow
+                icon={<DollarSign className="h-5 w-5 text-green-600" />}
+                label="Box Office"
+                value={formatBoxOffice(movie.domestic_box_office)}
+              />
+              <StatRow
+                icon={<Users className="h-5 w-5 text-blue-600" />}
+                label="Theaters"
+                value={formatTheaters(movie.theater_count)}
+              />
+              <StatRow
+                icon={<Star className="h-5 w-5 text-gold-500" />}
+                label="Metacritic"
+                value={formatMetacritic(movie.metacritic_score)}
+              />
+              {movie.rotten_tomatoes_score && (
+                <StatRow
+                  icon={<Star className="h-5 w-5 text-red-500" />}
+                  label="Rotten Tomatoes"
+                  value={`${movie.rotten_tomatoes_score}%`}
+                />
+              )}
+            </CardContent>
+          </Card>
+
           {/* Score Breakdown */}
           <ScoreBreakdown
             stats={{
@@ -220,8 +251,8 @@ export default async function MovieDetailPage({
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Stats Card */}
-          <Card>
+          {/* Stats Card - hidden on mobile (shown in main content instead) */}
+          <Card className="hidden lg:block">
             <CardHeader>
               <CardTitle>Stats</CardTitle>
             </CardHeader>
