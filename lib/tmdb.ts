@@ -132,8 +132,7 @@ class TMDBClient {
       page: page.toString(),
       sort_by: 'popularity.desc',
       'vote_count.gte': (options.minVoteCount ?? 0).toString(),
-      with_original_language: 'en',
-      // Always filter to US theatrical releases (types 2=limited, 3=wide)
+      // Filter to US theatrical releases (types 2=limited, 3=wide)
       // so we get movies by their US theatrical date, not festival premieres
       region: 'US',
       with_release_type: '2|3',
