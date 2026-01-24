@@ -213,6 +213,8 @@ export async function POST(request: NextRequest) {
 
     // Update the movie in the database
     const supabase = getSupabaseAdmin();
+    console.log(`Updating movie ${movieId} with metacritic_score=${metacriticScore} (updateData:`, JSON.stringify(updateData), ')');
+
     const { error: updateError } = await supabase
       .from('movies')
       .update(updateData)
@@ -226,6 +228,17 @@ export async function POST(request: NextRequest) {
       }, { status: 500 });
     }
 
+    // Read back to verify the update worked
+    const { data: verifyData, error: verifyError } = await supabase
+      .from('movies')
+      .select('metacritic_score, metacritic_source')
+      .eq('id', movieId)
+      .single();
+
+    const savedScore = verifyData?.metacritic_score;
+    const savedSource = verifyData?.metacritic_source;
+    console.log(`Verified saved values: metacritic_score=${savedScore}, metacritic_source=${savedSource}`);
+
     return NextResponse.json({
       success: true,
       imdbId,
@@ -237,6 +250,9 @@ export async function POST(request: NextRequest) {
         omdbHadScore,
         omdbRawScore,
         scraperCalled: !omdbHadScore && metacriticScore !== null && metacriticSource !== 'placeholder',
+        savedScore,
+        savedSource,
+        verifyError: verifyError?.message || null,
       },
       data: {
         ...data,

@@ -633,7 +633,8 @@ export default function LeagueMoviesPage() {
             `MC Source: ${data.debug.metacriticSource}`,
             `OMDB had score: ${data.debug.omdbHadScore}`,
             `OMDB raw: ${data.debug.omdbRawScore}`,
-            `Scraper called: ${data.debug.scraperCalled}`,
+            `Saved to DB: ${data.debug.savedScore}`,
+            `Saved source: ${data.debug.savedSource}`,
             `Theaters: ${data.data?.theater_count || 'none'}`,
           ].join('\n');
           alert(`Refresh result:\n${debugInfo}`);
