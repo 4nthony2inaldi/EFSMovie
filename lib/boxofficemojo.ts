@@ -196,11 +196,36 @@ function toMetacriticSlug(title: string): string {
  * Returns score as decimal (0-1), e.g., 81 -> 0.81
  */
 export async function scrapeMetacriticScore(imdbId: string, title: string, year?: number): Promise<number | null> {
-  // Try scraping directly from Metacritic
   const slug = toMetacriticSlug(title);
-  const metacriticUrl = `https://www.metacritic.com/movie/${slug}/`;
 
-  console.log(`Trying Metacritic URL: ${metacriticUrl}`);
+  // Build list of URLs to try - Metacritic sometimes appends the year to the slug
+  const urlsToTry = [
+    `https://www.metacritic.com/movie/${slug}/`,
+  ];
+
+  // Add year variants if we have a year
+  if (year) {
+    urlsToTry.push(`https://www.metacritic.com/movie/${slug}-${year}/`);
+    // Also try previous year (release dates can be off by a year)
+    urlsToTry.push(`https://www.metacritic.com/movie/${slug}-${year - 1}/`);
+  }
+
+  for (const metacriticUrl of urlsToTry) {
+    console.log(`Trying Metacritic URL: ${metacriticUrl}`);
+    const score = await tryFetchMetacriticScore(metacriticUrl, title);
+    if (score !== null) {
+      return score;
+    }
+  }
+
+  console.log(`No valid Metascore found on Metacritic for ${title} (tried ${urlsToTry.length} URLs)`);
+  return null;
+}
+
+/**
+ * Try to fetch and parse Metacritic score from a specific URL
+ */
+async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Promise<number | null> {
 
   try {
     const response = await fetch(metacriticUrl, {
@@ -212,13 +237,14 @@ export async function scrapeMetacriticScore(imdbId: string, title: string, year?
       },
     });
 
+    // If 404 or other error, this URL doesn't work - try next one
     if (!response.ok) {
-      console.log(`Metacritic fetch failed: ${response.status} for ${title}`);
+      console.log(`Metacritic fetch failed: ${response.status} for ${metacriticUrl}`);
       return null;
     }
 
     const html = await response.text();
-    console.log(`Metacritic HTML length: ${html.length} bytes`);
+    console.log(`Metacritic HTML length: ${html.length} bytes for ${metacriticUrl}`);
 
     // First, check if there's actually a Metascore on the page
     // Metacritic shows "tbd" or doesn't show a score if there aren't enough reviews
@@ -249,7 +275,7 @@ export async function scrapeMetacriticScore(imdbId: string, title: string, year?
         // Valid Metascores are typically 20-99; 100 is extremely rare and often indicates an error
         // Also reject very low scores that might be user ratings on 0-10 scale
         if (score >= 20 && score <= 99) {
-          console.log(`Scraped Metacritic ${score} from Metacritic.com for ${title}`);
+          console.log(`Scraped Metacritic ${score} from ${metacriticUrl} for ${title}`);
           return score / 100;
         } else if (score === 100) {
           // Log but don't immediately return - check if there are other matches
@@ -258,10 +284,11 @@ export async function scrapeMetacriticScore(imdbId: string, title: string, year?
       }
     }
 
-    console.log(`No valid Metascore found on Metacritic for ${title}`);
+    // Page loaded but no score found
+    console.log(`Page loaded but no valid Metascore pattern matched for ${title}`);
     return null;
   } catch (error) {
-    console.error(`Error scraping Metacritic for ${title}:`, error);
+    console.error(`Error fetching ${metacriticUrl}:`, error);
     return null;
   }
 }
