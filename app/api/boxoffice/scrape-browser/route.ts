@@ -226,9 +226,17 @@ export async function POST(request: NextRequest) {
       success: true,
       imdbId,
       release_type: releaseType,
+      debug: {
+        title,
+        metacriticScore,
+        metacriticSource,
+        omdbHadScore: false, // Will be true if OMDB provided the score
+        scraperCalled: metacriticScore !== null && metacriticSource !== 'placeholder',
+      },
       data: {
         ...data,
         metacritic_score: metacriticScore,
+        metacritic_source: metacriticSource,
       },
     });
   } catch (error) {
