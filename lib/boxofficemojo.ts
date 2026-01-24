@@ -257,10 +257,15 @@ async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Pr
     // Look for Metascore (critic score) first
     // The Metascore JSON-LD has a specific structure with "worstRating":0,"bestRating":100
     const metascorePatterns = [
-      // JSON-LD Metascore format - must have bestRating of 100 (critic score, not user 0-10)
+      // JSON-LD Metascore format - various field orderings
+      // Order: ratingValue, worstRating, bestRating
       /"ratingValue"\s*:\s*"?(\d+)"?\s*,\s*"worstRating"\s*:\s*0\s*,\s*"bestRating"\s*:\s*100/i,
-      // Alternative order
+      // Order: worstRating, bestRating, ratingValue
       /"worstRating"\s*:\s*0\s*,\s*"bestRating"\s*:\s*100[^}]*"ratingValue"\s*:\s*"?(\d+)"?/i,
+      // Order: bestRating, worstRating, ratingValue (common on Metacritic)
+      /"bestRating"\s*:\s*100\s*,\s*"worstRating"\s*:\s*0\s*,\s*"ratingValue"\s*:\s*"?(\d+)"?/i,
+      // Order: ratingValue, bestRating, worstRating
+      /"ratingValue"\s*:\s*"?(\d+)"?\s*,\s*"bestRating"\s*:\s*100\s*,\s*"worstRating"\s*:\s*0/i,
       // Metascore display class patterns
       /c-siteReviewScore_[^"]*metascore[^>]*>(\d+)</i,
       /data-metascore="(\d+)"/i,
