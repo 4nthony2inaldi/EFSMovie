@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
 import { hasOscarCaliberStudio, hasMajorStudio } from '@/lib/constants';
-import { Film, Loader2, Plus, Pencil, Trash2, Search, Download, Globe, Check, X, RefreshCw, DollarSign, Award, Filter, Clock, ThumbsUp, Building2 } from 'lucide-react';
+import { Film, Loader2, Plus, Pencil, Trash2, Search, Download, Globe, Check, X, RefreshCw, DollarSign, Award, Filter, Clock, ThumbsUp, Building2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 
 type ReleaseType = 'wide' | 'limited' | 'streaming' | 'unknown';
 
@@ -93,6 +93,12 @@ export default function LeagueMoviesPage() {
     theater_count: 0,
     metacritic_score: '',
   });
+
+  // Sorting state
+  type SortColumn = 'title' | 'release' | 'type' | 'box_office' | 'theaters' | 'metacritic' | 'score';
+  type SortDirection = 'asc' | 'desc';
+  const [sortColumn, setSortColumn] = useState<SortColumn>('release');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   useEffect(() => {
     loadMovies();
@@ -728,12 +734,57 @@ export default function LeagueMoviesPage() {
   });
   const studios = Array.from(studioSet).sort();
 
-  const filteredMovies = movies.filter((movie) => {
-    const matchesSearch = movie.title.toLowerCase().includes(search.toLowerCase());
-    const matchesMonth = filterMonth === '' || movie.release_month === filterMonth;
-    const matchesStudio = filterStudio === '' || (movie.production_companies && movie.production_companies.includes(filterStudio));
-    return matchesSearch && matchesMonth && matchesStudio;
-  });
+  // Handle column sorting
+  function handleSort(column: SortColumn) {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('desc'); // Default to descending for new column
+    }
+  }
+
+  // Sort indicator component
+  function SortIndicator({ column }: { column: SortColumn }) {
+    if (sortColumn !== column) {
+      return <ArrowUpDown className="h-3 w-3 text-gray-400" />;
+    }
+    return sortDirection === 'asc'
+      ? <ArrowUp className="h-3 w-3 text-purple-600" />
+      : <ArrowDown className="h-3 w-3 text-purple-600" />;
+  }
+
+  const filteredMovies = movies
+    .filter((movie) => {
+      const matchesSearch = movie.title.toLowerCase().includes(search.toLowerCase());
+      const matchesMonth = filterMonth === '' || movie.release_month === filterMonth;
+      const matchesStudio = filterStudio === '' || (movie.production_companies && movie.production_companies.includes(filterStudio));
+      return matchesSearch && matchesMonth && matchesStudio;
+    })
+    .sort((a, b) => {
+      const dir = sortDirection === 'asc' ? 1 : -1;
+
+      switch (sortColumn) {
+        case 'title':
+          return dir * a.title.localeCompare(b.title);
+        case 'release':
+          const aDate = a.release_year * 100 + a.release_month;
+          const bDate = b.release_year * 100 + b.release_month;
+          return dir * (aDate - bDate);
+        case 'type':
+          return dir * (a.release_type || '').localeCompare(b.release_type || '');
+        case 'box_office':
+          return dir * ((a.domestic_box_office || 0) - (b.domestic_box_office || 0));
+        case 'theaters':
+          return dir * ((a.theater_count || 0) - (b.theater_count || 0));
+        case 'metacritic':
+          return dir * ((a.metacritic_score || 0) - (b.metacritic_score || 0));
+        case 'score':
+          return dir * ((a.calculated_score || 0) - (b.calculated_score || 0));
+        default:
+          return 0;
+      }
+    });
 
   if (loading) {
     return (
@@ -1279,12 +1330,69 @@ export default function LeagueMoviesPage() {
               <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
-                    <th className="text-left p-3 sm:p-4 font-semibold text-sm">Movie</th>
-                    <th className="text-left p-3 sm:p-4 font-semibold text-sm">Release</th>
-                    <th className="text-left p-3 sm:p-4 font-semibold text-sm">Type</th>
-                    <th className="text-left p-3 sm:p-4 font-semibold text-sm hidden sm:table-cell">Box Office</th>
-                    <th className="text-left p-3 sm:p-4 font-semibold text-sm hidden md:table-cell">Theaters</th>
-                    <th className="text-left p-3 sm:p-4 font-semibold text-sm">Score</th>
+                    <th
+                      className="text-left p-3 sm:p-4 font-semibold text-sm cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('title')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Movie
+                        <SortIndicator column="title" />
+                      </div>
+                    </th>
+                    <th
+                      className="text-left p-3 sm:p-4 font-semibold text-sm cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('release')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Release
+                        <SortIndicator column="release" />
+                      </div>
+                    </th>
+                    <th
+                      className="text-left p-3 sm:p-4 font-semibold text-sm cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('type')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Type
+                        <SortIndicator column="type" />
+                      </div>
+                    </th>
+                    <th
+                      className="text-left p-3 sm:p-4 font-semibold text-sm hidden sm:table-cell cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('box_office')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Box Office
+                        <SortIndicator column="box_office" />
+                      </div>
+                    </th>
+                    <th
+                      className="text-left p-3 sm:p-4 font-semibold text-sm hidden md:table-cell cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('theaters')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Theaters
+                        <SortIndicator column="theaters" />
+                      </div>
+                    </th>
+                    <th
+                      className="text-left p-3 sm:p-4 font-semibold text-sm hidden lg:table-cell cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('metacritic')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Metacritic
+                        <SortIndicator column="metacritic" />
+                      </div>
+                    </th>
+                    <th
+                      className="text-left p-3 sm:p-4 font-semibold text-sm cursor-pointer hover:bg-gray-100 select-none"
+                      onClick={() => handleSort('score')}
+                    >
+                      <div className="flex items-center gap-1">
+                        Score
+                        <SortIndicator column="score" />
+                      </div>
+                    </th>
                     <th className="text-right p-3 sm:p-4 font-semibold text-sm">Actions</th>
                   </tr>
                 </thead>
@@ -1340,8 +1448,14 @@ export default function LeagueMoviesPage() {
                           : <span className="text-gray-400">-</span>
                         }
                       </td>
+                      <td className="p-3 sm:p-4 hidden lg:table-cell text-sm">
+                        {movie.metacritic_score
+                          ? `${Math.round(movie.metacritic_score * 100)}%`
+                          : <span className="text-gray-400">-</span>
+                        }
+                      </td>
                       <td className="p-3 sm:p-4">
-                        <Badge variant={movie.calculated_score > 500 ? 'green' : 'gray'}>
+                        <Badge variant={movie.calculated_score > 0 ? 'green' : 'gray'}>
                           {movie.calculated_score.toFixed(1)}
                         </Badge>
                       </td>
