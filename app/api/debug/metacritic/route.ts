@@ -67,6 +67,23 @@ export async function GET(request: NextRequest) {
 
       const html = await response.text();
 
+      // Extract JSON-LD blocks
+      const jsonLdBlocks: unknown[] = [];
+      const jsonLdRegex = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+      const jsonLdMatches = Array.from(html.matchAll(jsonLdRegex));
+      for (const jsonLdMatch of jsonLdMatches) {
+        try {
+          const parsed = JSON.parse(jsonLdMatch[1].trim());
+          jsonLdBlocks.push({
+            hasAggregateRating: !!parsed.aggregateRating,
+            aggregateRating: parsed.aggregateRating || null,
+            type: parsed['@type'],
+          });
+        } catch (e) {
+          jsonLdBlocks.push({ parseError: String(e), raw: jsonLdMatch[1].substring(0, 200) });
+        }
+      }
+
       // Find ratingValue patterns
       const ratingValueMatches: string[] = [];
       const rvRegex = /.{0,50}ratingValue.{0,50}/gi;
@@ -101,6 +118,7 @@ export async function GET(request: NextRequest) {
         slug,
         status: response.status,
         htmlLength: html.length,
+        jsonLdBlocks,
         ratingValueMatches,
         scoreMatches: scoreMatches.slice(0, 10),
         metascoreMatches,
