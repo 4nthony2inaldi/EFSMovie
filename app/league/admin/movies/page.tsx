@@ -625,19 +625,23 @@ export default function LeagueMoviesPage() {
         alert(`Failed to refresh ${movie.title}: ${data.error}`);
       } else {
         await loadMovies();
-        // Show debug info so we can diagnose metacritic issues
-        if (useBrowser && data.debug) {
-          const debugInfo = [
-            `Title: ${data.debug.title}`,
-            `MC Score: ${data.debug.metacriticScore}`,
-            `MC Source: ${data.debug.metacriticSource}`,
-            `OMDB had score: ${data.debug.omdbHadScore}`,
-            `OMDB raw: ${data.debug.omdbRawScore}`,
-            `Saved to DB: ${data.debug.savedScore}`,
-            `Saved source: ${data.debug.savedSource}`,
-            `Theaters: ${data.data?.theater_count || 'none'}`,
-          ].join('\n');
-          alert(`Refresh result:\n${debugInfo}`);
+        // Always show debug info for browser scraper
+        if (useBrowser) {
+          if (data.debug) {
+            const debugInfo = [
+              `Title: ${data.debug.title}`,
+              `MC Score: ${data.debug.metacriticScore}`,
+              `MC Source: ${data.debug.metacriticSource}`,
+              `OMDB had score: ${data.debug.omdbHadScore}`,
+              `OMDB raw: ${data.debug.omdbRawScore}`,
+              `Saved to DB: ${data.debug.savedScore}`,
+              `Saved source: ${data.debug.savedSource}`,
+              `Theaters: ${data.data?.theater_count || 'none'}`,
+            ].join('\n');
+            alert(`Refresh result:\n${debugInfo}`);
+          } else {
+            alert(`Refresh done but no debug info. Keys: ${Object.keys(data).join(', ')}`);
+          }
         }
       }
     } catch (error) {
