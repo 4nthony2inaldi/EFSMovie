@@ -1326,12 +1326,12 @@ export default function LeagueMoviesPage() {
               <p className="text-sm mt-2">Click &quot;Browse TMDB&quot; to import real movies</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px]">
+            <div>
+              <table className="w-full table-fixed">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
                     <th
-                      className="text-left p-3 sm:p-4 font-semibold text-sm cursor-pointer hover:bg-gray-100 select-none"
+                      className="text-left p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none w-[30%]"
                       onClick={() => handleSort('title')}
                     >
                       <div className="flex items-center gap-1">
@@ -1340,7 +1340,7 @@ export default function LeagueMoviesPage() {
                       </div>
                     </th>
                     <th
-                      className="text-left p-3 sm:p-4 font-semibold text-sm cursor-pointer hover:bg-gray-100 select-none"
+                      className="text-left p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none w-[10%]"
                       onClick={() => handleSort('release')}
                     >
                       <div className="flex items-center gap-1">
@@ -1349,7 +1349,7 @@ export default function LeagueMoviesPage() {
                       </div>
                     </th>
                     <th
-                      className="text-left p-3 sm:p-4 font-semibold text-sm cursor-pointer hover:bg-gray-100 select-none"
+                      className="text-left p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none w-[7%]"
                       onClick={() => handleSort('type')}
                     >
                       <div className="flex items-center gap-1">
@@ -1358,67 +1358,67 @@ export default function LeagueMoviesPage() {
                       </div>
                     </th>
                     <th
-                      className="text-left p-3 sm:p-4 font-semibold text-sm hidden sm:table-cell cursor-pointer hover:bg-gray-100 select-none"
+                      className="text-right p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none w-[12%]"
                       onClick={() => handleSort('box_office')}
                     >
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center justify-end gap-1">
                         Box Office
                         <SortIndicator column="box_office" />
                       </div>
                     </th>
                     <th
-                      className="text-left p-3 sm:p-4 font-semibold text-sm hidden md:table-cell cursor-pointer hover:bg-gray-100 select-none"
+                      className="text-right p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none w-[10%]"
                       onClick={() => handleSort('theaters')}
                     >
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center justify-end gap-1">
                         Theaters
                         <SortIndicator column="theaters" />
                       </div>
                     </th>
                     <th
-                      className="text-left p-3 sm:p-4 font-semibold text-sm hidden lg:table-cell cursor-pointer hover:bg-gray-100 select-none"
+                      className="text-right p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none w-[10%]"
                       onClick={() => handleSort('metacritic')}
                     >
-                      <div className="flex items-center gap-1">
-                        Metacritic
+                      <div className="flex items-center justify-end gap-1">
+                        MC
                         <SortIndicator column="metacritic" />
                       </div>
                     </th>
                     <th
-                      className="text-left p-3 sm:p-4 font-semibold text-sm cursor-pointer hover:bg-gray-100 select-none"
+                      className="text-right p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none w-[8%]"
                       onClick={() => handleSort('score')}
                     >
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center justify-end gap-1">
                         Score
                         <SortIndicator column="score" />
                       </div>
                     </th>
-                    <th className="text-right p-3 sm:p-4 font-semibold text-sm">Actions</th>
+                    <th className="text-right p-2 font-semibold text-xs w-[13%]">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredMovies.map((movie) => (
-                    <tr key={movie.id} className="border-b border-gray-100">
-                      <td className="p-3 sm:p-4">
-                        <div className="flex items-center gap-2 sm:gap-3">
+                    <tr key={movie.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="p-2">
+                        <div className="flex items-center gap-2">
                           {movie.poster_url ? (
                             <img
                               src={movie.poster_url}
                               alt={movie.title}
-                              className="w-8 h-12 sm:w-10 sm:h-14 object-cover rounded flex-shrink-0"
+                              className="w-8 h-12 object-cover rounded flex-shrink-0"
                             />
                           ) : (
-                            <div className="w-8 h-12 sm:w-10 sm:h-14 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
-                              <Film className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" />
+                            <div className="w-8 h-12 bg-gray-200 rounded flex items-center justify-center flex-shrink-0">
+                              <Film className="h-4 w-4 text-gray-400" />
                             </div>
                           )}
-                          <span className="font-medium text-sm sm:text-base truncate max-w-[120px] sm:max-w-none">{movie.title}</span>
+                          <span className="font-medium text-sm truncate">{movie.title}</span>
                         </div>
                       </td>
-                      <td className="p-3 sm:p-4 text-gray-600 text-sm whitespace-nowrap">
+                      <td className="p-2 text-gray-600 text-xs whitespace-nowrap">
                         {MONTHS[movie.release_month - 1].slice(0, 3)} {movie.release_year}
                       </td>
-                      <td className="p-3 sm:p-4">
+                      <td className="p-2">
                         <Badge
                           variant={
                             movie.release_type === 'wide' ? 'green' :
@@ -1429,63 +1429,58 @@ export default function LeagueMoviesPage() {
                           {movie.release_type === 'wide' ? 'W' :
                            movie.release_type === 'limited' ? 'L' :
                            movie.release_type === 'streaming' ? 'S' : '?'}
-                          <span className="hidden sm:inline ml-1">
-                            {movie.release_type === 'wide' ? 'ide' :
-                             movie.release_type === 'limited' ? 'imited' :
-                             movie.release_type === 'streaming' ? 'treaming' : ''}
-                          </span>
                         </Badge>
                       </td>
-                      <td className="p-3 sm:p-4 hidden sm:table-cell text-sm">
+                      <td className="p-2 text-right text-xs">
                         {movie.domestic_box_office > 0
                           ? formatCurrency(movie.domestic_box_office)
                           : <span className="text-gray-400">-</span>
                         }
                       </td>
-                      <td className="p-3 sm:p-4 hidden md:table-cell text-sm">
+                      <td className="p-2 text-right text-xs">
                         {movie.theater_count
                           ? movie.theater_count.toLocaleString()
                           : <span className="text-gray-400">-</span>
                         }
                       </td>
-                      <td className="p-3 sm:p-4 hidden lg:table-cell text-sm">
+                      <td className="p-2 text-right text-xs">
                         {movie.metacritic_score
-                          ? `${Math.round(movie.metacritic_score * 100)}%`
+                          ? `${Math.round(movie.metacritic_score * 100)}`
                           : <span className="text-gray-400">-</span>
                         }
                       </td>
-                      <td className="p-3 sm:p-4">
-                        <Badge variant={movie.calculated_score > 0 ? 'green' : 'gray'}>
+                      <td className="p-2 text-right">
+                        <span className={`text-xs font-medium ${movie.calculated_score > 0 ? 'text-green-600' : 'text-gray-400'}`}>
                           {movie.calculated_score.toFixed(1)}
-                        </Badge>
+                        </span>
                       </td>
-                      <td className="p-3 sm:p-4">
-                        <div className="flex items-center justify-end gap-0.5">
+                      <td className="p-2">
+                        <div className="flex items-center justify-end gap-0">
                           <button
                             onClick={() => refreshBoxOffice(movie, true)}
                             disabled={refreshingIds.has(movie.id)}
-                            className="p-1.5 sm:p-2 text-gray-400 hover:text-green-600 disabled:opacity-50"
-                            title="Refresh data from BOM"
+                            className="p-1 text-gray-400 hover:text-green-600 disabled:opacity-50"
+                            title="Refresh data"
                           >
                             {refreshingIds.has(movie.id) ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : (
-                              <RefreshCw className="h-4 w-4" />
+                              <RefreshCw className="h-3.5 w-3.5" />
                             )}
                           </button>
                           <button
                             onClick={() => startEdit(movie)}
-                            className="p-1.5 sm:p-2 text-gray-400 hover:text-purple-600"
+                            className="p-1 text-gray-400 hover:text-purple-600"
                             title="Edit"
                           >
-                            <Pencil className="h-4 w-4" />
+                            <Pencil className="h-3.5 w-3.5" />
                           </button>
                           <button
                             onClick={() => handleDelete(movie.id)}
-                            className="p-1.5 sm:p-2 text-gray-400 hover:text-red-600"
+                            className="p-1 text-gray-400 hover:text-red-600"
                             title="Delete"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </td>
