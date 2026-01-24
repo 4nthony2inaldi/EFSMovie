@@ -10,6 +10,26 @@ import { Film, Loader2, Plus, Pencil, Trash2, Search, Download, Globe, Check, X,
 
 type ReleaseType = 'wide' | 'limited' | 'streaming' | 'unknown';
 
+// Format money compactly for mobile (e.g., "$5.0M", "$183K")
+function formatCompactMoney(amount: number): string {
+  if (amount >= 1_000_000_000) {
+    return `$${(amount / 1_000_000_000).toFixed(1)}B`;
+  } else if (amount >= 1_000_000) {
+    return `$${(amount / 1_000_000).toFixed(1)}M`;
+  } else if (amount >= 1_000) {
+    return `$${(amount / 1_000).toFixed(0)}K`;
+  }
+  return `$${amount}`;
+}
+
+// Format theater count compactly (e.g., "3.5K")
+function formatCompactTheaters(count: number): string {
+  if (count >= 1_000) {
+    return `${(count / 1_000).toFixed(1)}K`;
+  }
+  return count.toString();
+}
+
 interface Movie {
   id: string;
   title: string;
@@ -96,7 +116,7 @@ export default function LeagueMoviesPage() {
   });
 
   // Sorting state
-  type SortColumn = 'title' | 'release' | 'type' | 'box_office' | 'theaters' | 'metacritic' | 'score';
+  type SortColumn = 'title' | 'release' | 'type' | 'box_office' | 'theaters' | 'metacritic';
   type SortDirection = 'asc' | 'desc';
   const [sortColumn, setSortColumn] = useState<SortColumn>('release');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -780,8 +800,6 @@ export default function LeagueMoviesPage() {
           return dir * ((a.theater_count || 0) - (b.theater_count || 0));
         case 'metacritic':
           return dir * ((a.metacritic_score || 0) - (b.metacritic_score || 0));
-        case 'score':
-          return dir * ((a.calculated_score || 0) - (b.calculated_score || 0));
         default:
           return 0;
       }
@@ -1327,12 +1345,12 @@ export default function LeagueMoviesPage() {
               <p className="text-sm mt-2">Click &quot;Browse TMDB&quot; to import real movies</p>
             </div>
           ) : (
-            <div>
-              <table className="w-full table-fixed">
+            <div className="overflow-x-auto">
+              <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
                     <th
-                      className="text-left p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none w-[30%]"
+                      className="text-left p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none min-w-[120px]"
                       onClick={() => handleSort('title')}
                     >
                       <div className="flex items-center gap-1">
@@ -1341,43 +1359,45 @@ export default function LeagueMoviesPage() {
                       </div>
                     </th>
                     <th
-                      className="text-left p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none w-[10%]"
+                      className="text-left p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap"
                       onClick={() => handleSort('release')}
                     >
                       <div className="flex items-center gap-1">
-                        Release
+                        <span className="hidden sm:inline">Release</span>
+                        <span className="sm:hidden">Rel</span>
                         <SortIndicator column="release" />
                       </div>
                     </th>
                     <th
-                      className="text-left p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none w-[7%]"
+                      className="text-center p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none"
                       onClick={() => handleSort('type')}
                     >
-                      <div className="flex items-center gap-1">
-                        Type
+                      <div className="flex items-center justify-center gap-1">
                         <SortIndicator column="type" />
                       </div>
                     </th>
                     <th
-                      className="text-right p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none w-[12%]"
+                      className="text-right p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap"
                       onClick={() => handleSort('box_office')}
                     >
                       <div className="flex items-center justify-end gap-1">
-                        Box Office
+                        <span className="hidden sm:inline">Box Office</span>
+                        <span className="sm:hidden">$</span>
                         <SortIndicator column="box_office" />
                       </div>
                     </th>
                     <th
-                      className="text-right p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none w-[10%]"
+                      className="text-right p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none whitespace-nowrap"
                       onClick={() => handleSort('theaters')}
                     >
                       <div className="flex items-center justify-end gap-1">
-                        Theaters
+                        <span className="hidden sm:inline">Theaters</span>
+                        <span className="sm:hidden">Thtr</span>
                         <SortIndicator column="theaters" />
                       </div>
                     </th>
                     <th
-                      className="text-right p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none w-[10%]"
+                      className="text-right p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none"
                       onClick={() => handleSort('metacritic')}
                     >
                       <div className="flex items-center justify-end gap-1">
@@ -1385,16 +1405,7 @@ export default function LeagueMoviesPage() {
                         <SortIndicator column="metacritic" />
                       </div>
                     </th>
-                    <th
-                      className="text-right p-2 font-semibold text-xs cursor-pointer hover:bg-gray-100 select-none w-[8%]"
-                      onClick={() => handleSort('score')}
-                    >
-                      <div className="flex items-center justify-end gap-1">
-                        Score
-                        <SortIndicator column="score" />
-                      </div>
-                    </th>
-                    <th className="text-right p-2 font-semibold text-xs w-[13%]">Actions</th>
+                    <th className="text-right p-2 font-semibold text-xs whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1413,13 +1424,13 @@ export default function LeagueMoviesPage() {
                               <Film className="h-4 w-4 text-gray-400" />
                             </div>
                           )}
-                          <span className="font-medium text-sm truncate">{movie.title}</span>
+                          <span className="font-medium text-sm line-clamp-2">{movie.title}</span>
                         </div>
                       </td>
                       <td className="p-2 text-gray-600 text-xs whitespace-nowrap">
-                        {MONTHS[movie.release_month - 1].slice(0, 3)} {movie.release_year}
+                        {MONTHS[movie.release_month - 1].slice(0, 3)} {String(movie.release_year).slice(2)}
                       </td>
-                      <td className="p-2">
+                      <td className="p-2 text-center">
                         <Badge
                           variant={
                             movie.release_type === 'wide' ? 'green' :
@@ -1432,15 +1443,15 @@ export default function LeagueMoviesPage() {
                            movie.release_type === 'streaming' ? 'S' : '?'}
                         </Badge>
                       </td>
-                      <td className="p-2 text-right text-xs">
+                      <td className="p-2 text-right text-xs whitespace-nowrap">
                         {movie.domestic_box_office > 0
-                          ? formatCurrency(movie.domestic_box_office)
+                          ? formatCompactMoney(movie.domestic_box_office)
                           : <span className="text-gray-400">-</span>
                         }
                       </td>
-                      <td className="p-2 text-right text-xs">
+                      <td className="p-2 text-right text-xs whitespace-nowrap">
                         {movie.theater_count
-                          ? movie.theater_count.toLocaleString()
+                          ? formatCompactTheaters(movie.theater_count)
                           : <span className="text-gray-400">-</span>
                         }
                       </td>
@@ -1454,11 +1465,6 @@ export default function LeagueMoviesPage() {
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
-                      </td>
-                      <td className="p-2 text-right">
-                        <span className={`text-xs font-medium ${movie.calculated_score > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                          {movie.calculated_score.toFixed(1)}
-                        </span>
                       </td>
                       <td className="p-2">
                         <div className="flex items-center justify-end gap-0">
