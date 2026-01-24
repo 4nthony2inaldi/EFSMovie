@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { scrapeBoxOfficeMojoBrowser } from '@/lib/scraper-browser';
-import { scrapeMetacriticScore } from '@/lib/boxofficemojo';
+import { scrapeMetacriticScore, MetacriticResult } from '@/lib/boxofficemojo';
 import { getMovieRatings } from '@/lib/api/omdb';
 import { tmdb } from '@/lib/tmdb';
 import type { ReleaseType } from '@/types';
@@ -113,25 +113,44 @@ export async function POST(request: NextRequest) {
     // Use multi-source scraper with title/year/month for release scale from BOM schedule
     const data = await scrapeBoxOfficeMojoBrowser(imdbId, title, releaseYear, releaseDate, month);
 
-    // Get Metacritic score - try OMDB first, fall back to scraping IMDB
+    // Get Metacritic score - try OMDB first, fall back to scraping Metacritic
     let metacriticScore: number | null = null;
+    let metacriticSource: 'metacritic' | 'user' | 'placeholder' | null = null;
+
     if (imdbId) {
       // Try OMDB first (most reliable when available)
       try {
         const ratings = await getMovieRatings(imdbId);
-        metacriticScore = ratings.metacritic;
-        if (metacriticScore) {
+        if (ratings.metacritic !== null) {
+          metacriticScore = ratings.metacritic;
+          metacriticSource = 'metacritic';
           console.log(`Got Metacritic score from OMDB: ${metacriticScore}`);
         }
       } catch (e) {
         console.log(`OMDB ratings fetch failed for ${imdbId}:`, e);
       }
 
-      // If OMDB doesn't have it, try scraping from IMDB page
-      if (!metacriticScore) {
-        console.log(`OMDB has no Metacritic for ${title}, trying IMDB scrape...`);
-        metacriticScore = await scrapeMetacriticScore(imdbId, title, releaseYear);
+      // If OMDB doesn't have it, try scraping Metacritic
+      if (metacriticScore === null) {
+        console.log(`OMDB has no Metacritic for ${title}, trying Metacritic scrape...`);
+        const scrapeResult: MetacriticResult = await scrapeMetacriticScore(imdbId, title, releaseYear);
+        if (scrapeResult.score !== null) {
+          metacriticScore = scrapeResult.score;
+          metacriticSource = scrapeResult.source;
+          console.log(`Scraped ${scrapeResult.source} score for ${title}: ${metacriticScore}`);
+        }
       }
+    }
+
+    // If still no score but we have both box office and theaters, use 50% placeholder
+    const hasBothBoxOfficeData = data &&
+      data.domestic_box_office > 0 &&
+      (data.theater_count > 0 || data.widest_release);
+
+    if (metacriticScore === null && hasBothBoxOfficeData) {
+      metacriticScore = 0.50; // 50%
+      metacriticSource = 'placeholder';
+      console.log(`Using 50% placeholder for ${title} (has box office and theaters but no MC)`);
     }
 
     // Determine release type - prefer BOM schedule data, fall back to theater count calculation
@@ -181,6 +200,11 @@ export async function POST(request: NextRequest) {
 
     if (metacriticScore !== null) {
       updateData.metacritic_score = metacriticScore;
+      updateData.metacritic_source = metacriticSource;
+    } else {
+      // Explicitly clear metacritic_score if we couldn't find a valid score
+      updateData.metacritic_score = null;
+      updateData.metacritic_source = null;
     }
 
     // Update the movie in the database
@@ -274,22 +298,41 @@ export async function PUT(request: NextRequest) {
           movie.release_month
         );
 
-        // Get Metacritic score - try OMDB first, fall back to scraping IMDB
+        // Get Metacritic score - try OMDB first, fall back to scraping Metacritic
         let metacriticScore: number | null = null;
+        let metacriticSource: 'metacritic' | 'user' | 'placeholder' | null = null;
+
         try {
           const ratings = await getMovieRatings(imdbId);
-          metacriticScore = ratings.metacritic;
-          if (metacriticScore) {
+          if (ratings.metacritic !== null) {
+            metacriticScore = ratings.metacritic;
+            metacriticSource = 'metacritic';
             console.log(`Got Metacritic ${metacriticScore} from OMDB for ${movie.title}`);
           }
         } catch (e) {
           console.log(`OMDB ratings fetch failed for ${movie.title}:`, e);
         }
 
-        // If OMDB doesn't have it, try scraping from IMDB page
-        if (!metacriticScore) {
-          console.log(`OMDB has no Metacritic for ${movie.title}, trying IMDB scrape...`);
-          metacriticScore = await scrapeMetacriticScore(imdbId, movie.title, movie.release_year);
+        // If OMDB doesn't have it, try scraping Metacritic
+        if (metacriticScore === null) {
+          console.log(`OMDB has no Metacritic for ${movie.title}, trying Metacritic scrape...`);
+          const scrapeResult: MetacriticResult = await scrapeMetacriticScore(imdbId, movie.title, movie.release_year);
+          if (scrapeResult.score !== null) {
+            metacriticScore = scrapeResult.score;
+            metacriticSource = scrapeResult.source;
+            console.log(`Scraped ${scrapeResult.source} score for ${movie.title}: ${metacriticScore}`);
+          }
+        }
+
+        // If still no score but we have both box office and theaters, use 50% placeholder
+        const hasBothBoxOfficeData = boxOfficeData &&
+          boxOfficeData.domestic_box_office > 0 &&
+          (boxOfficeData.theater_count > 0 || boxOfficeData.widest_release);
+
+        if (metacriticScore === null && hasBothBoxOfficeData) {
+          metacriticScore = 0.50; // 50%
+          metacriticSource = 'placeholder';
+          console.log(`Using 50% placeholder for ${movie.title}`);
         }
 
         // Determine release type - prefer BOM schedule data, fall back to theater count calculation
@@ -331,6 +374,11 @@ export async function PUT(request: NextRequest) {
 
         if (metacriticScore !== null) {
           updateData.metacritic_score = metacriticScore;
+          updateData.metacritic_source = metacriticSource;
+        } else {
+          // Explicitly clear metacritic_score if we couldn't find a valid score
+          updateData.metacritic_score = null;
+          updateData.metacritic_source = null;
         }
 
         await supabase
@@ -339,7 +387,7 @@ export async function PUT(request: NextRequest) {
           .eq('id', movie.id);
 
         results.success++;
-        console.log(`Updated ${movie.title}: theaters=${boxOfficeData?.theater_count}, metacritic=${metacriticScore}`);
+        console.log(`Updated ${movie.title}: theaters=${boxOfficeData?.theater_count}, metacritic=${metacriticScore}, source=${metacriticSource}`);
 
         // Rate limit: wait 1 second between requests to avoid hitting rate limits
         await new Promise(resolve => setTimeout(resolve, 1000));
