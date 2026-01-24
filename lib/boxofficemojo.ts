@@ -255,19 +255,27 @@ async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Pr
     console.log(`Metacritic HTML length: ${html.length} bytes for ${metacriticUrl}`);
 
     // Look for Metascore (critic score) first
-    // The Metascore JSON-LD has a specific structure with "worstRating":0,"bestRating":100
+    // Try to find JSON-LD aggregateRating with bestRating:100 (critic score scale)
+    // First, try to find a rating block with bestRating:100 and extract ratingValue
+    const criticRatingBlockMatch = html.match(/"aggregateRating"\s*:\s*\{[^}]*"bestRating"\s*:\s*100[^}]*\}/i);
+    if (criticRatingBlockMatch) {
+      const block = criticRatingBlockMatch[0];
+      const ratingValueMatch = block.match(/"ratingValue"\s*:\s*"?(\d+)"?/i);
+      if (ratingValueMatch) {
+        const score = parseInt(ratingValueMatch[1], 10);
+        if (score >= 1 && score <= 99) {
+          console.log(`Found Metascore ${score} in aggregateRating block for ${title}`);
+          return { score: score / 100, source: 'metacritic' };
+        } else if (score === 100) {
+          console.log(`Found score of 100 for ${title} - likely an error, continuing search`);
+        }
+      }
+    }
+
+    // Fallback: try various pattern orderings for critic score
     const metascorePatterns = [
-      // JSON-LD Metascore format - various field orderings
-      // Order: ratingValue, worstRating, bestRating
-      /"ratingValue"\s*:\s*"?(\d+)"?\s*,\s*"worstRating"\s*:\s*0\s*,\s*"bestRating"\s*:\s*100/i,
-      // Order: worstRating, bestRating, ratingValue
-      /"worstRating"\s*:\s*0\s*,\s*"bestRating"\s*:\s*100[^}]*"ratingValue"\s*:\s*"?(\d+)"?/i,
-      // Order: bestRating, worstRating, ratingValue (common on Metacritic)
-      /"bestRating"\s*:\s*100\s*,\s*"worstRating"\s*:\s*0\s*,\s*"ratingValue"\s*:\s*"?(\d+)"?/i,
-      // Order: ratingValue, bestRating, worstRating
-      /"ratingValue"\s*:\s*"?(\d+)"?\s*,\s*"bestRating"\s*:\s*100\s*,\s*"worstRating"\s*:\s*0/i,
       // Metascore display class patterns
-      /c-siteReviewScore_[^"]*metascore[^>]*>(\d+)</i,
+      /c-siteReviewScore[^"]*metascore[^>]*>(\d+)</i,
       /data-metascore="(\d+)"/i,
       // Score element with Metascore label nearby
       />(\d+)<\/span>\s*<\/a>\s*<span[^>]*>Metascore/i,
@@ -290,10 +298,23 @@ async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Pr
 
     // No Metascore found - try to get User Score as fallback
     // User scores are on a 0-10 scale (like 7.6), we need to convert to 0-100
+    // First try to find a rating block with bestRating:10 (user score scale)
+    const userRatingBlockMatch = html.match(/"aggregateRating"\s*:\s*\{[^}]*"bestRating"\s*:\s*10[,\s}][^}]*\}/i);
+    if (userRatingBlockMatch) {
+      const block = userRatingBlockMatch[0];
+      const ratingValueMatch = block.match(/"ratingValue"\s*:\s*"?([\d.]+)"?/i);
+      if (ratingValueMatch) {
+        const userScore = parseFloat(ratingValueMatch[1]);
+        if (userScore >= 0 && userScore <= 10) {
+          const convertedScore = Math.round(userScore * 10);
+          console.log(`Found user score ${userScore} (${convertedScore}%) in aggregateRating block for ${title}`);
+          return { score: convertedScore / 100, source: 'user' };
+        }
+      }
+    }
+
+    // Fallback: try display patterns for user score
     const userScorePatterns = [
-      // JSON-LD user score format - bestRating of 10
-      /"ratingValue"\s*:\s*"?([\d.]+)"?\s*,\s*"worstRating"\s*:\s*0\s*,\s*"bestRating"\s*:\s*10[^0]/i,
-      /"worstRating"\s*:\s*0\s*,\s*"bestRating"\s*:\s*10[^0][^}]*"ratingValue"\s*:\s*"?([\d.]+)"?/i,
       // User score display patterns
       /USER\s*SCORE[^>]*>[^<]*<[^>]*>([\d.]+)/i,
       /c-siteReviewScore[^"]*user[^>]*>([\d.]+)</i,
