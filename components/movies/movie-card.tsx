@@ -58,9 +58,9 @@ export function MovieCard({ movie, ownerName, showOwner = true, isOnWatchlist = 
   // Determine card background style
   // Gold tint = hit box office cap, Grey = hasn't beat floor yet
   const cardBgClass = isMaxedPerTheater
-    ? 'bg-gradient-to-r from-gold-50 to-white border-gold-200'
+    ? 'bg-gradient-to-r from-amber-50 via-yellow-50 to-white border-amber-200'
     : !beatFloor && metacritic > 0
-    ? 'bg-gray-50 border-gray-200'
+    ? 'bg-gray-100 border-gray-300 opacity-75'
     : 'bg-white border-gray-200';
 
   return (
