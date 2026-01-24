@@ -42,10 +42,22 @@ export async function GET(request: NextRequest) {
     results.scrapeError = error instanceof Error ? error.message : 'Unknown error';
   }
 
-  // If debug mode, fetch IMDB page and look for metacritic-related content
+  // If debug mode, fetch Metacritic page directly and look for score content
   if (debug) {
+    // Convert title to Metacritic slug
+    const slug = title
+      .toLowerCase()
+      .replace(/[:']/g, '')
+      .replace(/&/g, 'and')
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    const metacriticUrl = `https://www.metacritic.com/movie/${slug}/`;
+
     try {
-      const response = await fetch(`https://www.imdb.com/title/${imdbId}/`, {
+      const response = await fetch(metacriticUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -53,43 +65,49 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      if (response.ok) {
-        const html = await response.text();
+      const html = await response.text();
 
-        // Find all occurrences of "metacritic" in the HTML (case-insensitive)
-        const metacriticMatches: string[] = [];
-        const regex = /.{0,100}metacritic.{0,100}/gi;
-        let match;
-        while ((match = regex.exec(html)) !== null && metacriticMatches.length < 10) {
-          metacriticMatches.push(match[0]);
-        }
-
-        // Also look for "metascore"
-        const metascoreMatches: string[] = [];
-        const msRegex = /.{0,100}metascore.{0,100}/gi;
-        while ((match = msRegex.exec(html)) !== null && metascoreMatches.length < 10) {
-          metascoreMatches.push(match[0]);
-        }
-
-        // Look for score patterns with numbers
-        const scorePatternMatches: string[] = [];
-        const scoreRegex = /"score"\s*:\s*\d+/gi;
-        while ((match = scoreRegex.exec(html)) !== null && scorePatternMatches.length < 10) {
-          scorePatternMatches.push(match[0]);
-        }
-
-        results.imdbDebug = {
-          status: response.status,
-          htmlLength: html.length,
-          metacriticMatches,
-          metascoreMatches,
-          scorePatternMatches,
-        };
-      } else {
-        results.imdbDebug = { error: `HTTP ${response.status}` };
+      // Find ratingValue patterns
+      const ratingValueMatches: string[] = [];
+      const rvRegex = /.{0,50}ratingValue.{0,50}/gi;
+      let match;
+      while ((match = rvRegex.exec(html)) !== null && ratingValueMatches.length < 10) {
+        ratingValueMatches.push(match[0]);
       }
+
+      // Find score patterns
+      const scoreMatches: string[] = [];
+      const scoreRegex = /.{0,30}score.{0,30}/gi;
+      while ((match = scoreRegex.exec(html)) !== null && scoreMatches.length < 15) {
+        scoreMatches.push(match[0]);
+      }
+
+      // Find metascore patterns
+      const metascoreMatches: string[] = [];
+      const msRegex = /.{0,50}metascore.{0,50}/gi;
+      while ((match = msRegex.exec(html)) !== null && metascoreMatches.length < 10) {
+        metascoreMatches.push(match[0]);
+      }
+
+      // Look for 2-digit numbers that could be scores (60-100 range typically)
+      const numberMatches: string[] = [];
+      const numRegex = />([6-9]\d|100)</g;
+      while ((match = numRegex.exec(html)) !== null && numberMatches.length < 20) {
+        numberMatches.push(match[0]);
+      }
+
+      results.metacriticDebug = {
+        url: metacriticUrl,
+        slug,
+        status: response.status,
+        htmlLength: html.length,
+        ratingValueMatches,
+        scoreMatches: scoreMatches.slice(0, 10),
+        metascoreMatches,
+        numberMatches,
+      };
     } catch (error) {
-      results.imdbDebug = { error: error instanceof Error ? error.message : 'Unknown error' };
+      results.metacriticDebug = { error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 

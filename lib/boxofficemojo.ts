@@ -163,39 +163,63 @@ export async function scrapeBoxOfficeData(imdbId: string): Promise<BoxOfficeData
 }
 
 /**
- * Scrape Metacritic score from IMDB page (fallback when OMDB doesn't have data)
+ * Convert a movie title to a Metacritic URL slug
+ * e.g., "28 Years Later: The Bone Temple" -> "28-years-later-the-bone-temple"
+ */
+function toMetacriticSlug(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[:']/g, '') // Remove colons and apostrophes
+    .replace(/&/g, 'and') // Replace & with 'and'
+    .replace(/[^a-z0-9\s-]/g, '') // Remove other special characters
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/-+/g, '-') // Collapse multiple hyphens
+    .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+}
+
+/**
+ * Scrape Metacritic score directly from Metacritic website
  * Returns score as decimal (0-1), e.g., 81 -> 0.81
  */
 export async function scrapeMetacriticScore(imdbId: string, title: string, year?: number): Promise<number | null> {
-  // Try scraping from IMDB page which shows the Metascore
-  const url = `https://www.imdb.com/title/${imdbId}/`;
+  // Try scraping directly from Metacritic
+  const slug = toMetacriticSlug(title);
+  const metacriticUrl = `https://www.metacritic.com/movie/${slug}/`;
+
+  console.log(`Trying Metacritic URL: ${metacriticUrl}`);
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(metacriticUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
+        'Cache-Control': 'no-cache',
       },
     });
 
     if (!response.ok) {
-      console.log(`IMDB fetch failed: ${response.status} for ${title}`);
+      console.log(`Metacritic fetch failed: ${response.status} for ${title}`);
       return null;
     }
 
     const html = await response.text();
+    console.log(`Metacritic HTML length: ${html.length} bytes`);
 
-    // Look for Metascore on IMDB page - check JSON data and HTML
+    // Look for Metascore on Metacritic page
     const scorePatterns = [
-      // IMDB JSON format: "metacritic":{"metascore":{"score":81
-      /"metacritic":\s*\{\s*"metascore":\s*\{\s*"score":\s*(\d+)/i,
-      // Older formats
-      /metacriticScore[^}]*"ratingValue"\s*:\s*"?(\d+)"?/i,
-      /Metascore[^0-9]*(\d+)/i,
-      /"aggregateRating"[^}]*"ratingValue"\s*:\s*"?(\d+)"?[^}]*"Metacritic"/i,
-      /score-meta[^>]*>(\d+)</i,
-      /metacritic[^>]*>(\d+)</i,
+      // JSON-LD format: "ratingValue":"80"
+      /"ratingValue"\s*:\s*"?(\d+)"?/i,
+      // Metacritic score display patterns
+      /data-v-\w+[^>]*>(\d+)<\/span>[^<]*<\/div>[^<]*Metascore/i,
+      /metascore[^>]*>(\d+)/i,
+      /class="[^"]*score[^"]*"[^>]*>(\d+)</i,
+      /data-score="(\d+)"/i,
+      // Score in title or header
+      /Metascore[:\s]*(\d+)/i,
+      // Generic score pattern near "metascore" or "score"
+      />(\d+)<\/span>\s*<\/a>\s*<span[^>]*>Metascore/i,
+      /c-siteReviewScore[^>]*>(\d+)</i,
     ];
 
     for (const pattern of scorePatterns) {
@@ -203,17 +227,16 @@ export async function scrapeMetacriticScore(imdbId: string, title: string, year?
       if (match) {
         const score = parseInt(match[1], 10);
         if (score >= 0 && score <= 100) {
-          console.log(`Scraped Metacritic ${score} from IMDB for ${title}`);
-          // Return as decimal
+          console.log(`Scraped Metacritic ${score} from Metacritic.com for ${title}`);
           return score / 100;
         }
       }
     }
 
-    console.log(`No Metacritic score found on IMDB for ${title}`);
+    console.log(`No score found on Metacritic for ${title}`);
     return null;
   } catch (error) {
-    console.error(`Error scraping IMDB for ${title}:`, error);
+    console.error(`Error scraping Metacritic for ${title}:`, error);
     return null;
   }
 }
