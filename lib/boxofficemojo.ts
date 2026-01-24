@@ -293,21 +293,29 @@ async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Pr
       }
     }
 
-    // Fallback: try HTML patterns for critic score
-    const metascorePatterns = [
-      /c-siteReviewScore[^"]*metascore[^>]*>(\d+)</i,
-      /data-metascore="(\d+)"/i,
-      />(\d+)<\/span>\s*<\/a>\s*<span[^>]*>Metascore/i,
-      /Metascore[^<]*<[^>]*>(\d+)</i,
-    ];
+    // Check if the page shows "Metascore TBD" - if so, don't try HTML patterns
+    // (they would pick up scores from recommendation sections, not the actual movie)
+    const hasTbdMetascore = /title="Metascore TBD"|aria-label="Metascore TBD"|Metascore:\s*tbd/i.test(html);
+    if (hasTbdMetascore) {
+      console.log(`Page shows Metascore TBD for ${title}, skipping HTML pattern fallback`);
+      // Don't return yet - try user score fallback below
+    } else {
+      // Fallback: try HTML patterns for critic score
+      const metascorePatterns = [
+        /c-siteReviewScore[^"]*metascore[^>]*>(\d+)</i,
+        /data-metascore="(\d+)"/i,
+        />(\d+)<\/span>\s*<\/a>\s*<span[^>]*>Metascore/i,
+        /Metascore[^<]*<[^>]*>(\d+)</i,
+      ];
 
-    for (const pattern of metascorePatterns) {
-      const match = html.match(pattern);
-      if (match) {
-        const score = parseInt(match[1], 10);
-        if (score >= 1 && score <= 99) {
-          console.log(`Scraped Metacritic critic score ${score} via HTML pattern for ${title}`);
-          return { score: score / 100, source: 'metacritic' };
+      for (const pattern of metascorePatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          const score = parseInt(match[1], 10);
+          if (score >= 1 && score <= 99) {
+            console.log(`Scraped Metacritic critic score ${score} via HTML pattern for ${title}`);
+            return { score: score / 100, source: 'metacritic' };
+          }
         }
       }
     }
