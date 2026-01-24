@@ -68,24 +68,38 @@ export async function scrapeBoxOfficeData(imdbId: string): Promise<BoxOfficeData
     };
 
     // Look for Domestic box office
-    // BOM shows: "DOMESTIC (48.1%)" then "$15,000,000" - we need the dollar amount, not the percentage
-    // Look for dollar amounts that are at least $100,000 (6+ digits)
-    const moneyMatches = html.match(/\$[\d,]+/g);
-    if (moneyMatches) {
-      // Find the largest dollar amount on the page (likely the total gross)
-      const amounts = moneyMatches.map(m => parseMoney(m)).filter(n => n >= 100000);
-      if (amounts.length > 0) {
-        // The domestic box office is usually one of the larger amounts
-        // Sort descending and take a reasonable one (not worldwide which is largest)
-        amounts.sort((a, b) => b - a);
-        // If we have multiple amounts, domestic is often the 2nd or 3rd largest
-        // But for safety, let's look specifically for the domestic section
-        const domesticSection = html.match(/DOMESTIC[^$]*\$([\d,]+)/i);
+    // BOM structure: "DOMESTIC (48.1%)" followed by "$15,000,000"
+    // OR "DOMESTIC (–)" with "–" below when there's no domestic data
+    // We need to be careful not to pick up INTERNATIONAL or WORLDWIDE numbers
+
+    // First check if domestic exists (not just a dash)
+    const domesticDashCheck = html.match(/DOMESTIC\s*\([^)]*\)\s*<[^>]*>\s*[\-–—]/i);
+    if (domesticDashCheck) {
+      // Domestic shows a dash, meaning no domestic box office
+      console.log('BOM shows no domestic box office (dash)');
+      data.domestic_box_office = 0;
+    } else {
+      // Look for DOMESTIC with a percentage, then find the dollar amount nearby
+      // The pattern should match: DOMESTIC (XX.X%) ... $XXX,XXX
+      // But NOT match across INTERNATIONAL section
+      const domesticWithPercent = html.match(/DOMESTIC\s*\(\s*[\d.]+%?\s*\)[^I]*?\$([\d,]+)/i);
+      if (domesticWithPercent) {
+        data.domestic_box_office = parseMoney(domesticWithPercent[1]);
+        console.log(`Found domestic box office with percentage: $${data.domestic_box_office}`);
+      } else {
+        // Alternative: look for domestic in a more structured way
+        // Match DOMESTIC followed by dollar amount within 200 chars, before hitting INTERNATIONAL
+        const domesticSection = html.match(/DOMESTIC[^I]{0,200}\$([\d,]+)/i);
         if (domesticSection) {
-          data.domestic_box_office = parseMoney(domesticSection[1]);
-        } else if (amounts.length > 0) {
-          // Fallback to largest reasonable amount
-          data.domestic_box_office = amounts[0];
+          // Verify this isn't after a dash indicating no data
+          const beforeDollar = html.substring(
+            html.indexOf('DOMESTIC'),
+            html.indexOf(domesticSection[0]) + domesticSection[0].length
+          );
+          if (!beforeDollar.match(/>\s*[\-–—]\s*</)) {
+            data.domestic_box_office = parseMoney(domesticSection[1]);
+            console.log(`Found domestic box office (alt pattern): $${data.domestic_box_office}`);
+          }
         }
       }
     }
