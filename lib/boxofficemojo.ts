@@ -254,30 +254,43 @@ async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Pr
     const html = await response.text();
     console.log(`Metacritic HTML length: ${html.length} bytes for ${metacriticUrl}`);
 
-    // Look for Metascore (critic score) first
-    // Try to find JSON-LD aggregateRating with bestRating:100 (critic score scale)
-    // First, try to find a rating block with bestRating:100 and extract ratingValue
-    const criticRatingBlockMatch = html.match(/"aggregateRating"\s*:\s*\{[^}]*"bestRating"\s*:\s*100[^}]*\}/i);
-    if (criticRatingBlockMatch) {
-      const block = criticRatingBlockMatch[0];
-      const ratingValueMatch = block.match(/"ratingValue"\s*:\s*"?(\d+)"?/i);
-      if (ratingValueMatch) {
-        const score = parseInt(ratingValueMatch[1], 10);
-        if (score >= 1 && score <= 99) {
-          console.log(`Found Metascore ${score} in aggregateRating block for ${title}`);
-          return { score: score / 100, source: 'metacritic' };
-        } else if (score === 100) {
-          console.log(`Found score of 100 for ${title} - likely an error, continuing search`);
+    // Try to parse JSON-LD blocks to find aggregateRating
+    const jsonLdMatches = html.matchAll(/<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+
+    for (const jsonLdMatch of jsonLdMatches) {
+      try {
+        const jsonText = jsonLdMatch[1].trim();
+        const jsonData = JSON.parse(jsonText);
+
+        // Check if this JSON-LD has an aggregateRating
+        const rating = jsonData.aggregateRating;
+        if (rating && rating.ratingValue !== undefined) {
+          const bestRating = rating.bestRating;
+          const ratingValue = parseFloat(rating.ratingValue);
+
+          // Critic score uses 0-100 scale (bestRating: 100)
+          if (bestRating === 100 && ratingValue >= 1 && ratingValue <= 99) {
+            console.log(`Found Metascore ${ratingValue} via JSON-LD parsing for ${title}`);
+            return { score: ratingValue / 100, source: 'metacritic' };
+          }
+
+          // User score uses 0-10 scale (bestRating: 10)
+          if (bestRating === 10 && ratingValue >= 0 && ratingValue <= 10) {
+            const convertedScore = Math.round(ratingValue * 10);
+            console.log(`Found user score ${ratingValue} (${convertedScore}%) via JSON-LD parsing for ${title}`);
+            return { score: convertedScore / 100, source: 'user' };
+          }
         }
+      } catch (e) {
+        // JSON parse failed, continue to next block
+        console.log(`Failed to parse JSON-LD block: ${e}`);
       }
     }
 
-    // Fallback: try various pattern orderings for critic score
+    // Fallback: try HTML patterns for critic score
     const metascorePatterns = [
-      // Metascore display class patterns
       /c-siteReviewScore[^"]*metascore[^>]*>(\d+)</i,
       /data-metascore="(\d+)"/i,
-      // Score element with Metascore label nearby
       />(\d+)<\/span>\s*<\/a>\s*<span[^>]*>Metascore/i,
       /Metascore[^<]*<[^>]*>(\d+)</i,
     ];
@@ -286,36 +299,15 @@ async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Pr
       const match = html.match(pattern);
       if (match) {
         const score = parseInt(match[1], 10);
-        // Valid Metascores are typically 20-99; 100 is extremely rare and often indicates an error
-        if (score >= 20 && score <= 99) {
-          console.log(`Scraped Metacritic critic score ${score} from ${metacriticUrl} for ${title}`);
+        if (score >= 1 && score <= 99) {
+          console.log(`Scraped Metacritic critic score ${score} via HTML pattern for ${title}`);
           return { score: score / 100, source: 'metacritic' };
-        } else if (score === 100) {
-          console.log(`Found score of 100 for ${title} - likely an error, continuing search`);
         }
       }
     }
 
-    // No Metascore found - try to get User Score as fallback
-    // User scores are on a 0-10 scale (like 7.6), we need to convert to 0-100
-    // First try to find a rating block with bestRating:10 (user score scale)
-    const userRatingBlockMatch = html.match(/"aggregateRating"\s*:\s*\{[^}]*"bestRating"\s*:\s*10[,\s}][^}]*\}/i);
-    if (userRatingBlockMatch) {
-      const block = userRatingBlockMatch[0];
-      const ratingValueMatch = block.match(/"ratingValue"\s*:\s*"?([\d.]+)"?/i);
-      if (ratingValueMatch) {
-        const userScore = parseFloat(ratingValueMatch[1]);
-        if (userScore >= 0 && userScore <= 10) {
-          const convertedScore = Math.round(userScore * 10);
-          console.log(`Found user score ${userScore} (${convertedScore}%) in aggregateRating block for ${title}`);
-          return { score: convertedScore / 100, source: 'user' };
-        }
-      }
-    }
-
-    // Fallback: try display patterns for user score
+    // Fallback: try HTML patterns for user score
     const userScorePatterns = [
-      // User score display patterns
       /USER\s*SCORE[^>]*>[^<]*<[^>]*>([\d.]+)/i,
       /c-siteReviewScore[^"]*user[^>]*>([\d.]+)</i,
       /data-userscore="([\d.]+)"/i,
@@ -325,11 +317,9 @@ async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Pr
       const match = html.match(pattern);
       if (match) {
         const userScore = parseFloat(match[1]);
-        // Valid user scores are 0-10
         if (userScore >= 0 && userScore <= 10) {
-          // Convert to 0-100 scale (6.2 -> 62)
           const convertedScore = Math.round(userScore * 10);
-          console.log(`Scraped Metacritic user score ${userScore} (${convertedScore}%) from ${metacriticUrl} for ${title}`);
+          console.log(`Scraped user score ${userScore} (${convertedScore}%) via HTML pattern for ${title}`);
           return { score: convertedScore / 100, source: 'user' };
         }
       }
