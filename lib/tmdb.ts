@@ -133,17 +133,13 @@ class TMDBClient {
       sort_by: 'popularity.desc',
       'vote_count.gte': (options.minVoteCount ?? 0).toString(),
       with_original_language: 'en',
-      // Always filter to US releases so we get movies by their US release date,
-      // not their worldwide premiere date (which may be in a different month/year)
+      // Always filter to US theatrical releases (types 2=limited, 3=wide)
+      // so we get movies by their US theatrical date, not festival premieres
       region: 'US',
+      with_release_type: '2|3',
       'release_date.gte': startDate,
       'release_date.lte': endDate,
     };
-
-    // For past/current releases, also restrict to theatrical release types
-    if (options.restrictReleaseType) {
-      params.with_release_type = '2|3';
-    }
 
     // Exclude Documentary (99) and TV Movie (10770) genres
     if (options.excludeDocumentaries) {
