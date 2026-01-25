@@ -63,14 +63,19 @@ export default async function StandingsPage() {
     .eq('league_id', currentTeam.league_id);
 
   // Get teams that have submitted bids for the active auction
+  // Using a database function to bypass RLS and see all teams' submission status
   let teamsWithBids: Set<string> = new Set();
   if (activeAuction) {
-    const { data: bidsData } = await supabase
-      .from('bids')
-      .select('team_id')
-      .eq('auction_id', activeAuction.id);
+    const { data: submissionStatus } = await supabase
+      .rpc('get_auction_submission_status', { p_auction_id: activeAuction.id });
 
-    teamsWithBids = new Set((bidsData || []).map(b => b.team_id));
+    if (submissionStatus) {
+      for (const row of submissionStatus) {
+        if (row.has_submitted) {
+          teamsWithBids.add(row.team_id);
+        }
+      }
+    }
   }
 
   const totalTeams = leagueTeams?.length || 0;
