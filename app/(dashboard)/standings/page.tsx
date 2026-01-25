@@ -81,6 +81,7 @@ export default async function StandingsPage() {
   const totalTeams = leagueTeams?.length || 0;
   const teamsSubmitted = teamsWithBids.size;
   const teamsPending = totalTeams - teamsSubmitted;
+  const currentUserHasSubmitted = teamsWithBids.has(currentTeam.id);
 
   // Combine standings with movies and bid status
   const standingsWithMovies: TeamWithMovies[] = (standings || []).map((team: TeamStanding) => {
@@ -165,7 +166,7 @@ export default async function StandingsPage() {
                 className="bg-white text-purple-700 px-4 py-2 rounded-lg font-medium hover:bg-purple-50 transition-colors flex items-center gap-2 text-sm"
               >
                 <Gavel className="h-4 w-4" />
-                Make Picks
+                {currentUserHasSubmitted ? 'Edit Picks' : 'Make Picks'}
               </Link>
             </div>
           </div>
