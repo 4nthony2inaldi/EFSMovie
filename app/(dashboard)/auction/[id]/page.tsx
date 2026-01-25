@@ -334,11 +334,12 @@ export default function AuctionDetailPage({
 
       // Upsert new/updated bids
       if (bidUpserts.length > 0) {
-        const { error: upsertError } = await supabase
+        const { error: upsertError, data: upsertData } = await supabase
           .from('bids')
           .upsert(bidUpserts, {
             onConflict: 'auction_id,team_id,movie_id',
-          });
+          })
+          .select();
 
         if (upsertError) {
           console.error('Failed to save bids:', upsertError);
@@ -346,6 +347,32 @@ export default function AuctionDetailPage({
           setSubmitting(false);
           return;
         }
+
+        // Verify the bids were actually saved
+        const { data: verifyBids, error: verifyError } = await supabase
+          .from('bids')
+          .select('movie_id, amount')
+          .eq('auction_id', auctionId)
+          .eq('team_id', team.id);
+
+        if (verifyError) {
+          console.error('Failed to verify bids:', verifyError);
+          alert(`Error verifying bids: ${verifyError.message}`);
+          setSubmitting(false);
+          return;
+        }
+
+        const savedCount = verifyBids?.length || 0;
+        const expectedCount = bidUpserts.length;
+
+        if (savedCount !== expectedCount) {
+          console.error('Bid count mismatch:', { savedCount, expectedCount, verifyBids });
+          alert(`Warning: Only ${savedCount} of ${expectedCount} bids were saved. This might be a permissions issue. Please try again or contact support.`);
+          setSubmitting(false);
+          return;
+        }
+
+        console.log(`Successfully saved ${savedCount} bids`);
       }
 
       // Update saved state
