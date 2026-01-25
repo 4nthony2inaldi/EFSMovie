@@ -289,52 +289,76 @@ export default function AuctionDetailPage({
 
   // Submit all bids
   const submitBids = async () => {
-    if (!team || !auctionId) return;
+    if (!team || !auctionId) {
+      console.error('Submit failed: missing team or auctionId', { team, auctionId });
+      alert('Error: Missing team or auction information. Please refresh the page.');
+      return;
+    }
 
     setSubmitting(true);
     setSubmitSuccess(false);
 
-    // Build upsert array for all bids (including priorities)
-    const bidUpserts = Array.from(bids.entries())
-      .filter(([_, amount]) => amount > 0)
-      .map(([movieId, amount]) => ({
-        auction_id: auctionId,
-        team_id: team.id,
-        movie_id: movieId,
-        amount,
-        priority: priorities.get(movieId) ?? null,
-        updated_at: new Date().toISOString(),
-      }));
+    try {
+      // Build upsert array for all bids (including priorities)
+      const bidUpserts = Array.from(bids.entries())
+        .filter(([_, amount]) => amount > 0)
+        .map(([movieId, amount]) => ({
+          auction_id: auctionId,
+          team_id: team.id,
+          movie_id: movieId,
+          amount,
+          priority: priorities.get(movieId) ?? null,
+          updated_at: new Date().toISOString(),
+        }));
 
-    // Delete bids that were removed (in savedBids but not in current bids or amount is 0)
-    const deletedMovieIds = Array.from(savedBids.keys()).filter(
-      movieId => !bids.has(movieId) || bids.get(movieId) === 0
-    );
+      // Delete bids that were removed (in savedBids but not in current bids or amount is 0)
+      const deletedMovieIds = Array.from(savedBids.keys()).filter(
+        movieId => !bids.has(movieId) || bids.get(movieId) === 0
+      );
 
-    if (deletedMovieIds.length > 0) {
-      await supabase
-        .from('bids')
-        .delete()
-        .eq('auction_id', auctionId)
-        .eq('team_id', team.id)
-        .in('movie_id', deletedMovieIds);
+      if (deletedMovieIds.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('bids')
+          .delete()
+          .eq('auction_id', auctionId)
+          .eq('team_id', team.id)
+          .in('movie_id', deletedMovieIds);
+
+        if (deleteError) {
+          console.error('Failed to delete bids:', deleteError);
+          alert(`Error deleting bids: ${deleteError.message}`);
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      // Upsert new/updated bids
+      if (bidUpserts.length > 0) {
+        const { error: upsertError } = await supabase
+          .from('bids')
+          .upsert(bidUpserts, {
+            onConflict: 'auction_id,team_id,movie_id',
+          });
+
+        if (upsertError) {
+          console.error('Failed to save bids:', upsertError);
+          alert(`Error saving bids: ${upsertError.message}`);
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      // Update saved state
+      setSavedBids(new Map(bids));
+      setSavedPriorities(new Map(priorities));
+      setSubmitting(false);
+      setSubmitSuccess(true);
+      setTimeout(() => setSubmitSuccess(false), 3000);
+    } catch (error) {
+      console.error('Submit error:', error);
+      alert(`Error submitting bids: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setSubmitting(false);
     }
-
-    // Upsert new/updated bids
-    if (bidUpserts.length > 0) {
-      await supabase
-        .from('bids')
-        .upsert(bidUpserts, {
-          onConflict: 'auction_id,team_id,movie_id',
-        });
-    }
-
-    // Update saved state
-    setSavedBids(new Map(bids));
-    setSavedPriorities(new Map(priorities));
-    setSubmitting(false);
-    setSubmitSuccess(true);
-    setTimeout(() => setSubmitSuccess(false), 3000);
   };
 
   // Unsubmit all bids
