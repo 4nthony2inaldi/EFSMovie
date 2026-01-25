@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Header } from '@/components/layout/header';
 import { ScoreBreakdown } from '@/components/movies/score-breakdown';
 import { WatchlistButton } from '@/components/movies/watchlist-button';
+import { BackButton } from '@/components/ui/back-button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatScore, formatBoxOffice, formatTheaters, formatMetacritic } from '@/lib/scoring';
@@ -19,7 +20,6 @@ import {
   Users,
   ExternalLink,
   Play,
-  ArrowLeft,
   Building2,
 } from 'lucide-react';
 
@@ -76,13 +76,7 @@ export default async function MovieDetailPage({
 
   return (
     <>
-      <Link
-        href="/movies"
-        className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 mb-4"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Movies
-      </Link>
+      <BackButton fallbackHref="/movies" label="Back" />
 
       <div className="grid lg:grid-cols-3 gap-8">
         {/* Main Content */}
