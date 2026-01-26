@@ -35,9 +35,16 @@ export async function GET(request: Request) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      // If this is a password recovery flow, redirect to reset-password
-      if (type === 'recovery') {
-        return NextResponse.redirect(`${origin}/reset-password`);
+      // Check if this is a password recovery flow
+      // We check both the URL type parameter and a cookie set by the forgot-password page
+      const isPasswordReset = type === 'recovery' ||
+        cookieStore.get('password_reset_pending')?.value === 'true';
+
+      if (isPasswordReset) {
+        // Clear the password reset cookie
+        const response = NextResponse.redirect(`${origin}/reset-password`);
+        response.cookies.delete('password_reset_pending');
+        return response;
       }
       return NextResponse.redirect(`${origin}${next}`);
     }

@@ -17,6 +17,10 @@ export default function ForgotPasswordPage() {
     setError(null);
     setLoading(true);
 
+    // Set a cookie to indicate this is a password reset flow
+    // This will be checked in the auth callback since Supabase doesn't pass the type parameter
+    document.cookie = 'password_reset_pending=true; path=/; max-age=3600; SameSite=Lax';
+
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/callback`,
     });
