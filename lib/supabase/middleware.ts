@@ -2,6 +2,15 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function updateSession(request: NextRequest) {
+  // If there's an auth code in the URL, redirect to the callback route to exchange it
+  const code = request.nextUrl.searchParams.get('code');
+  if (code && !request.nextUrl.pathname.startsWith('/auth/callback')) {
+    const url = request.nextUrl.clone();
+    // Preserve any other params like 'type' for recovery detection
+    url.pathname = '/auth/callback';
+    return NextResponse.redirect(url);
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
