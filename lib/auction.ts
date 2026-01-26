@@ -108,9 +108,20 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
     return 1000 - bid.amount;
   };
 
+  // Log all bids with priorities for debugging
+  console.log('=== AUCTION RESOLUTION DEBUG ===');
+  console.log('All bids:', (allBids || []).map(b => ({
+    movie_id: b.movie_id,
+    team_id: b.team_id,
+    amount: b.amount,
+    priority: b.priority,
+    effectivePriority: getEffectivePriority(b),
+  })));
+
   // 7. Process each movie
   for (const auctionMovie of sortedMovies) {
     const movieId = auctionMovie.movie_id;
+    const movieTitle = (auctionMovie as any).movie?.title || movieId;
 
     // Get all non-zero bids for this movie
     const movieBids = (allBids || [])
@@ -129,11 +140,16 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
         return b.tiebreaker - a.tiebreaker;
       });
 
+    console.log(`\nProcessing movie: ${movieTitle} (${movieId})`);
+    console.log(`  Total bidders: ${movieBids.length}`);
+
     // Find first eligible bidder
     for (let bidIndex = 0; bidIndex < movieBids.length; bidIndex++) {
       const bid = movieBids[bidIndex];
       const currentWins = teamWinCount.get(bid.team_id) || 0;
       const currentTeamAssignments = teamAssignments.get(bid.team_id) || [];
+
+      console.log(`  Bidder ${bidIndex + 1}: team=${bid.team_id}, amount=$${bid.amount}, priority=${bid.priority}, currentWins=${currentWins}`);
 
       if (currentWins < maxMoviesPerTeam) {
         // Team has room, assign directly
@@ -147,14 +163,17 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
         currentTeamAssignments.push(assignment);
         teamAssignments.set(bid.team_id, currentTeamAssignments);
         teamWinCount.set(bid.team_id, currentWins + 1);
+        console.log(`  -> ASSIGNED directly (team now has ${currentWins + 1} movies)`);
         break;
       } else {
         // Team already has max movies - check if this one has higher priority
         const thisPriority = getEffectivePriority(bid);
+        console.log(`  Team at max (${maxMoviesPerTeam}), checking swap. thisPriority=${thisPriority}`);
 
         // Find the lowest priority (highest number) current assignment for this team
         let lowestPriorityIdx = -1;
         let lowestPriority = -Infinity;
+        let lowestPriorityMovieId = '';
 
         currentTeamAssignments.forEach((assignment, idx) => {
           const assignmentBid = (allBids || []).find(
@@ -162,10 +181,14 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
           );
           if (assignmentBid) {
             const assignmentPriority = getEffectivePriority(assignmentBid);
+            console.log(`    Current assignment ${idx}: movieId=${assignment.movieId}, priority=${assignmentBid.priority}, effectivePriority=${assignmentPriority}`);
             if (assignmentPriority > lowestPriority) {
               lowestPriority = assignmentPriority;
               lowestPriorityIdx = idx;
+              lowestPriorityMovieId = assignment.movieId;
             }
+          } else {
+            console.log(`    WARNING: Could not find bid for assignment ${idx}: movieId=${assignment.movieId}`);
           }
         });
 
@@ -175,9 +198,12 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
           return otherWins < maxMoviesPerTeam;
         });
 
+        console.log(`  lowestPriority=${lowestPriority} (movie=${lowestPriorityMovieId}), hasOtherEligibleBidders=${hasOtherEligibleBidders}`);
+
         // If this movie has better priority, OR if this is the only eligible bidder
         // (no other bidders with room), force the swap to prevent unowned movies
         const shouldSwap = thisPriority < lowestPriority || !hasOtherEligibleBidders;
+        console.log(`  shouldSwap=${shouldSwap} (${thisPriority} < ${lowestPriority} = ${thisPriority < lowestPriority}, !hasOther=${!hasOtherEligibleBidders})`);
 
         if (shouldSwap && lowestPriorityIdx >= 0) {
           // Remove the old assignment from the main list
@@ -202,15 +228,22 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
           currentTeamAssignments.splice(lowestPriorityIdx, 1, newAssignment);
           teamAssignments.set(bid.team_id, currentTeamAssignments);
 
+          console.log(`  -> SWAPPED: removed ${removedAssignment.movieId}, added ${movieId}`);
           // Note: The removed movie will be processed again in a later pass
           // to find its new owner (next highest bidder who's eligible)
           break;
+        } else {
+          console.log(`  -> NO SWAP (lowestPriorityIdx=${lowestPriorityIdx})`);
         }
         // If this movie doesn't have higher priority and there are other eligible bidders, skip this bidder
       }
     }
     // If no eligible bidder found, movie goes unowned
   }
+
+  console.log('\n=== FINAL ASSIGNMENTS ===');
+  assignments.forEach(a => console.log(`  ${a.movieId} -> team ${a.teamId} for $${a.winningBid}`));
+  console.log('=== END DEBUG ===\n');
 
   // 7b. Second pass: Reassign movies that were bumped due to priority swaps
   // Find movies in auctionMovies that aren't in assignments
