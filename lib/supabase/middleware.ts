@@ -40,7 +40,8 @@ export async function updateSession(request: NextRequest) {
   const isAuthPage = request.nextUrl.pathname.startsWith('/login') ||
     request.nextUrl.pathname.startsWith('/signup') ||
     request.nextUrl.pathname.startsWith('/forgot-password') ||
-    request.nextUrl.pathname.startsWith('/reset-password');
+    request.nextUrl.pathname.startsWith('/reset-password') ||
+    request.nextUrl.pathname.startsWith('/auth/callback');
 
   const isPublicPage = request.nextUrl.pathname === '/';
 
@@ -51,9 +52,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // If user is logged in and trying to access auth pages (except reset-password which needs a session)
+  // If user is logged in and trying to access auth pages (except reset-password which needs a session, and auth/callback which handles redirects)
   const isResetPasswordPage = request.nextUrl.pathname.startsWith('/reset-password');
-  if (user && isAuthPage && !isResetPasswordPage) {
+  const isAuthCallback = request.nextUrl.pathname.startsWith('/auth/callback');
+  if (user && isAuthPage && !isResetPasswordPage && !isAuthCallback) {
     const url = request.nextUrl.clone();
     url.pathname = '/standings';
     return NextResponse.redirect(url);
