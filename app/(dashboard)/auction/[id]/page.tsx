@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -29,6 +29,9 @@ import {
   Plus,
   User,
   ListOrdered,
+  ChevronDown,
+  ChevronRight,
+  Users,
 } from 'lucide-react';
 import { AuctionTmdbBrowser } from '@/components/auction/auction-tmdb-browser';
 import { BidPriorityManager } from '@/components/auction/bid-priority-manager';
@@ -59,6 +62,7 @@ export default function AuctionDetailPage({
   const [seasonEndYear, setSeasonEndYear] = useState<number | null>(null);
   const [showTmdbBrowser, setShowTmdbBrowser] = useState(false);
   const [showMobilePriority, setShowMobilePriority] = useState(false);
+  const [expandedBids, setExpandedBids] = useState<Set<string>>(new Set());
   const [existingTmdbIds, setExistingTmdbIds] = useState<number[]>([]);
   const [userAddedCount, setUserAddedCount] = useState(0);
   const [userAddedMovieIds, setUserAddedMovieIds] = useState<Set<string>>(new Set());
@@ -177,12 +181,30 @@ export default function AuctionDetailPage({
         const resultsData = movieList.map((movie) => {
           const ownership = teamMovies?.find((tm) => tm.movie_id === movie.id);
           const yourBid = existingBids?.find((b) => b.movie_id === movie.id);
+          // Get all bids for this movie, sorted by amount (descending), then by priority (ascending)
+          const movieBids = (allBids || [])
+            .filter((b: any) => b.movie_id === movie.id)
+            .sort((a: any, b: any) => {
+              // Sort by amount descending first
+              if (b.amount !== a.amount) return b.amount - a.amount;
+              // Then by priority ascending (lower priority number = higher priority)
+              const aPriority = a.priority ?? Infinity;
+              const bPriority = b.priority ?? Infinity;
+              return aPriority - bPriority;
+            })
+            .map((b: any) => ({
+              team_id: b.team_id,
+              team_name: b.team?.name || 'Unknown',
+              amount: b.amount,
+              priority: b.priority,
+            }));
 
           return {
             movie,
             winner: ownership?.team || null,
             winning_bid: ownership?.winning_bid || 0,
             your_bid: yourBid?.amount || null,
+            all_bids: movieBids,
             status: ownership
               ? ownership.team_id === currentTeam.id
                 ? 'won'
@@ -502,6 +524,7 @@ export default function AuctionDetailPage({
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="w-10 p-4"></th>
                     <th className="text-left p-4 font-semibold text-gray-900">Movie</th>
                     <th className="text-left p-4 font-semibold text-gray-900 hidden sm:table-cell">Type</th>
                     <th className="text-left p-4 font-semibold text-gray-900">Winner</th>
@@ -513,75 +536,172 @@ export default function AuctionDetailPage({
                 <tbody>
                   {results.map((result) => {
                     const releaseType = result.movie.release_type as ReleaseType;
+                    const isExpanded = expandedBids.has(result.movie.id);
+                    const toggleExpand = () => {
+                      setExpandedBids((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(result.movie.id)) {
+                          next.delete(result.movie.id);
+                        } else {
+                          next.add(result.movie.id);
+                        }
+                        return next;
+                      });
+                    };
                     return (
-                    <tr key={result.movie.id} className="border-b border-gray-100">
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          {result.movie.poster_url ? (
-                            <img
-                              src={result.movie.poster_url}
-                              alt={result.movie.title}
-                              className="w-10 h-15 object-cover rounded"
-                            />
-                          ) : (
-                            <div className="w-10 h-15 bg-gray-200 rounded flex items-center justify-center">
-                              <Film className="h-4 w-4 text-gray-400" />
+                    <Fragment key={result.movie.id}>
+                      <tr className={cn(
+                        "border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors",
+                        isExpanded && "bg-purple-50/50"
+                      )} onClick={toggleExpand}>
+                        <td className="p-4">
+                          <button
+                            className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                            onClick={(e) => { e.stopPropagation(); toggleExpand(); }}
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </button>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            {result.movie.poster_url ? (
+                              <img
+                                src={result.movie.poster_url}
+                                alt={result.movie.title}
+                                className="w-10 h-15 object-cover rounded"
+                              />
+                            ) : (
+                              <div className="w-10 h-15 bg-gray-200 rounded flex items-center justify-center">
+                                <Film className="h-4 w-4 text-gray-400" />
+                              </div>
+                            )}
+                            <div>
+                              <Link
+                                href={`/movies/${result.movie.id}`}
+                                className="font-medium text-gray-900 hover:text-purple-600"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {result.movie.title}
+                              </Link>
+                              {result.all_bids?.length > 0 && (
+                                <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                                  <Users className="h-3 w-3" />
+                                  {result.all_bids.length} bid{result.all_bids.length !== 1 ? 's' : ''}
+                                </div>
+                              )}
                             </div>
+                          </div>
+                        </td>
+                        <td className="p-4 hidden sm:table-cell">
+                          <Badge
+                            variant={
+                              releaseType === 'wide' ? 'green' :
+                              releaseType === 'limited' ? 'purple' :
+                              releaseType === 'streaming' ? 'default' : 'gray'
+                            }
+                          >
+                            {releaseType === 'wide' ? 'Wide' :
+                             releaseType === 'limited' ? 'Limited' :
+                             releaseType === 'streaming' ? 'Streaming' : '?'}
+                          </Badge>
+                        </td>
+                        <td className="p-4">
+                          {result.winner ? (
+                            <Link
+                              href={`/teams/${result.winner.id}`}
+                              className="text-gray-700 hover:text-purple-600"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {result.winner.name}
+                            </Link>
+                          ) : (
+                            <span className="text-gray-400">Unowned</span>
                           )}
-                          <Link
-                            href={`/movies/${result.movie.id}`}
-                            className="font-medium text-gray-900 hover:text-purple-600"
-                          >
-                            {result.movie.title}
-                          </Link>
-                        </div>
-                      </td>
-                      <td className="p-4 hidden sm:table-cell">
-                        <Badge
-                          variant={
-                            releaseType === 'wide' ? 'green' :
-                            releaseType === 'limited' ? 'purple' :
-                            releaseType === 'streaming' ? 'default' : 'gray'
-                          }
-                        >
-                          {releaseType === 'wide' ? 'Wide' :
-                           releaseType === 'limited' ? 'Limited' :
-                           releaseType === 'streaming' ? 'Streaming' : '?'}
-                        </Badge>
-                      </td>
-                      <td className="p-4">
-                        {result.winner ? (
-                          <Link
-                            href={`/teams/${result.winner.id}`}
-                            className="text-gray-700 hover:text-purple-600"
-                          >
-                            {result.winner.name}
-                          </Link>
-                        ) : (
-                          <span className="text-gray-400">Unowned</span>
-                        )}
-                      </td>
-                      <td className="p-4 text-right font-medium">
-                        {result.winning_bid > 0 ? formatCurrency(result.winning_bid) : '-'}
-                      </td>
-                      <td className="p-4 text-right">
-                        {result.your_bid !== null ? formatCurrency(result.your_bid) : '-'}
-                      </td>
-                      <td className="p-4 text-center">
-                        {result.status === 'won' && (
-                          <Badge variant="green">Won</Badge>
-                        )}
-                        {result.status === 'outbid' && (
-                          <Badge variant="red">Outbid</Badge>
-                        )}
-                        {result.status === 'unowned' && (
-                          <Badge variant="gray">Unowned</Badge>
-                        )}
-                        {result.status === 'no_bid' && (
-                          <Badge variant="gray">No Bid</Badge>
-                        )}
-                      </td>
-                    </tr>
+                        </td>
+                        <td className="p-4 text-right font-medium">
+                          {result.winning_bid > 0 ? formatCurrency(result.winning_bid) : '-'}
+                        </td>
+                        <td className="p-4 text-right">
+                          {result.your_bid !== null ? formatCurrency(result.your_bid) : '-'}
+                        </td>
+                        <td className="p-4 text-center">
+                          {result.status === 'won' && (
+                            <Badge variant="green">Won</Badge>
+                          )}
+                          {result.status === 'outbid' && (
+                            <Badge variant="red">Outbid</Badge>
+                          )}
+                          {result.status === 'unowned' && (
+                            <Badge variant="gray">Unowned</Badge>
+                          )}
+                          {result.status === 'no_bid' && (
+                            <Badge variant="gray">No Bid</Badge>
+                          )}
+                        </td>
+                      </tr>
+                      {/* Expanded bid details row */}
+                      {isExpanded && (
+                        <tr key={`${result.movie.id}-bids`} className="bg-purple-50/30">
+                          <td colSpan={7} className="px-4 pb-4 pt-0">
+                            <div className="ml-10 bg-white rounded-lg border border-purple-200 p-4">
+                              <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                                <Users className="h-4 w-4 text-purple-600" />
+                                All Bids ({result.all_bids?.length || 0})
+                              </h4>
+                              {result.all_bids?.length > 0 ? (
+                                <div className="space-y-2">
+                                  {result.all_bids.map((bid: any, index: number) => (
+                                    <div
+                                      key={bid.team_id}
+                                      className={cn(
+                                        "flex items-center justify-between py-2 px-3 rounded-lg text-sm",
+                                        index === 0 && result.winner
+                                          ? "bg-green-50 border border-green-200"
+                                          : "bg-gray-50"
+                                      )}
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 text-xs font-medium flex items-center justify-center">
+                                          {index + 1}
+                                        </span>
+                                        <span className={cn(
+                                          "font-medium",
+                                          index === 0 && result.winner ? "text-green-700" : "text-gray-700"
+                                        )}>
+                                          {bid.team_name}
+                                        </span>
+                                        {index === 0 && result.winner && (
+                                          <Trophy className="h-4 w-4 text-green-600" />
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-4">
+                                        {bid.priority !== null && bid.priority !== undefined && (
+                                          <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
+                                            Priority: {bid.priority + 1}
+                                          </span>
+                                        )}
+                                        <span className={cn(
+                                          "font-semibold",
+                                          index === 0 && result.winner ? "text-green-700" : "text-gray-900"
+                                        )}>
+                                          {formatCurrency(bid.amount)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-gray-500 italic">No bids were placed on this movie</p>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );})}
                 </tbody>
               </table>
