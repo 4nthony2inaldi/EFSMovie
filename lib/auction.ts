@@ -130,7 +130,8 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
       });
 
     // Find first eligible bidder
-    for (const bid of movieBids) {
+    for (let bidIndex = 0; bidIndex < movieBids.length; bidIndex++) {
+      const bid = movieBids[bidIndex];
       const currentWins = teamWinCount.get(bid.team_id) || 0;
       const currentTeamAssignments = teamAssignments.get(bid.team_id) || [];
 
@@ -168,8 +169,17 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
           }
         });
 
-        // If this movie has better priority, swap it in
-        if (thisPriority < lowestPriority && lowestPriorityIdx >= 0) {
+        // Check if there are any other eligible bidders after this one
+        const hasOtherEligibleBidders = movieBids.slice(bidIndex + 1).some((otherBid) => {
+          const otherWins = teamWinCount.get(otherBid.team_id) || 0;
+          return otherWins < maxMoviesPerTeam;
+        });
+
+        // If this movie has better priority, OR if this is the only eligible bidder
+        // (no other bidders with room), force the swap to prevent unowned movies
+        const shouldSwap = thisPriority < lowestPriority || !hasOtherEligibleBidders;
+
+        if (shouldSwap && lowestPriorityIdx >= 0) {
           // Remove the old assignment from the main list
           const removedAssignment = currentTeamAssignments[lowestPriorityIdx];
           const mainIdx = assignments.findIndex(
@@ -196,7 +206,7 @@ export async function resolveAuction(auctionId: string): Promise<MovieAssignment
           // to find its new owner (next highest bidder who's eligible)
           break;
         }
-        // If this movie doesn't have higher priority, skip this bidder and try next
+        // If this movie doesn't have higher priority and there are other eligible bidders, skip this bidder
       }
     }
     // If no eligible bidder found, movie goes unowned
