@@ -6,7 +6,7 @@ import { useLeague } from '@/contexts/league-context';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
-import { Users, Loader2, Trash2, UserX, X, Check } from 'lucide-react';
+import { Users, Loader2, Trash2, UserX, X, Check, Pencil, DollarSign } from 'lucide-react';
 
 interface Team {
   id: string;
@@ -25,6 +25,9 @@ export default function LeagueTeamsPage() {
   const [confirmingTeamId, setConfirmingTeamId] = useState<string | null>(null);
   const [removingTeamId, setRemovingTeamId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editingBudgetTeamId, setEditingBudgetTeamId] = useState<string | null>(null);
+  const [editingBudgetValue, setEditingBudgetValue] = useState<string>('');
+  const [savingBudget, setSavingBudget] = useState(false);
 
   useEffect(() => {
     loadTeams();
@@ -74,6 +77,48 @@ export default function LeagueTeamsPage() {
       setError('Network error: Failed to remove team');
       setRemovingTeamId(null);
       setConfirmingTeamId(null);
+    }
+  }
+
+  function startEditingBudget(team: Team) {
+    setEditingBudgetTeamId(team.id);
+    setEditingBudgetValue(team.budget_remaining.toString());
+    setError(null);
+  }
+
+  async function saveBudget(teamId: string) {
+    setSavingBudget(true);
+    setError(null);
+
+    const newBudget = parseFloat(editingBudgetValue);
+    if (isNaN(newBudget) || newBudget < 0) {
+      setError('Please enter a valid budget amount');
+      setSavingBudget(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/admin/update-team-budget', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId, newBudget }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error || 'Failed to update budget');
+        setSavingBudget(false);
+        return;
+      }
+
+      setEditingBudgetTeamId(null);
+      setEditingBudgetValue('');
+      setSavingBudget(false);
+      loadTeams();
+    } catch (err) {
+      setError('Network error: Failed to update budget');
+      setSavingBudget(false);
     }
   }
 
@@ -135,9 +180,59 @@ export default function LeagueTeamsPage() {
                       </div>
                     </td>
                     <td className="p-4">
-                      <span className={team.budget_remaining < 100 ? 'text-red-600' : 'text-green-600'}>
-                        {formatCurrency(team.budget_remaining)}
-                      </span>
+                      {editingBudgetTeamId === team.id ? (
+                        <div className="flex items-center gap-1">
+                          <div className="relative">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={editingBudgetValue}
+                              onChange={(e) => setEditingBudgetValue(e.target.value)}
+                              className="w-24 pl-5 pr-2 py-1 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') saveBudget(team.id);
+                                if (e.key === 'Escape') setEditingBudgetTeamId(null);
+                              }}
+                            />
+                          </div>
+                          <button
+                            onClick={() => saveBudget(team.id)}
+                            disabled={savingBudget}
+                            className="p-1 bg-green-100 text-green-600 hover:bg-green-200 rounded transition-colors disabled:opacity-50"
+                            title="Save"
+                          >
+                            {savingBudget ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Check className="h-4 w-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setEditingBudgetTeamId(null)}
+                            disabled={savingBudget}
+                            className="p-1 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded transition-colors disabled:opacity-50"
+                            title="Cancel"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <span className={team.budget_remaining < 100 ? 'text-red-600' : 'text-green-600'}>
+                            {formatCurrency(team.budget_remaining)}
+                          </span>
+                          <button
+                            onClick={() => startEditingBudget(team)}
+                            className="p-1 text-gray-400 hover:text-purple-600 transition-colors"
+                            title="Edit budget"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
                     </td>
                     <td className="p-4 text-gray-600">
                       {new Date(team.created_at).toLocaleDateString()}

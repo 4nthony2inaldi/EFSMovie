@@ -57,28 +57,50 @@ export async function PATCH(
 
       console.log(`Unresolving auction ${auctionId}: found ${teamMovies?.length || 0} team_movies to refund`);
 
-      // Refund budgets for won movies
+      // Refund budgets for won movies using raw SQL to avoid type issues
       for (const tm of teamMovies || []) {
-        const { data: team, error: teamError } = await adminSupabase
-          .from('teams')
-          .select('budget_remaining')
-          .eq('id', tm.team_id)
-          .single();
-
-        if (teamError) {
-          console.error('Error fetching team for refund:', teamError);
+        const winningBid = parseFloat(String(tm.winning_bid)) || 0;
+        if (winningBid <= 0) {
+          console.log(`Skipping refund for team ${tm.team_id}: winning_bid is ${tm.winning_bid}`);
           continue;
         }
 
-        if (team) {
-          const { error: updateError } = await adminSupabase
-            .from('teams')
-            .update({ budget_remaining: Number(team.budget_remaining) + Number(tm.winning_bid) })
-            .eq('id', tm.team_id);
+        // Use RPC or raw increment to avoid float/string issues
+        const { error: updateError } = await adminSupabase.rpc('refund_budget', {
+          p_team_id: tm.team_id,
+          p_amount: winningBid,
+        });
 
-          if (updateError) {
-            console.error('Error refunding budget:', updateError);
+        if (updateError) {
+          // Fallback to direct update if RPC doesn't exist
+          console.log('RPC refund_budget not found, using direct update');
+          const { data: team, error: teamError } = await adminSupabase
+            .from('teams')
+            .select('budget_remaining')
+            .eq('id', tm.team_id)
+            .single();
+
+          if (teamError) {
+            console.error('Error fetching team for refund:', teamError);
+            continue;
           }
+
+          if (team) {
+            const currentBudget = parseFloat(String(team.budget_remaining)) || 0;
+            const newBudget = currentBudget + winningBid;
+            console.log(`Refunding team ${tm.team_id}: ${currentBudget} + ${winningBid} = ${newBudget}`);
+
+            const { error: directUpdateError } = await adminSupabase
+              .from('teams')
+              .update({ budget_remaining: newBudget })
+              .eq('id', tm.team_id);
+
+            if (directUpdateError) {
+              console.error('Error refunding budget:', directUpdateError);
+            }
+          }
+        } else {
+          console.log(`Refunded ${winningBid} to team ${tm.team_id} via RPC`);
         }
       }
 
