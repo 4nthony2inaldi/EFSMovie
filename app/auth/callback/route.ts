@@ -33,14 +33,10 @@ export async function GET(request: Request) {
       }
     );
 
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
       // If this is a password recovery flow, redirect to reset-password
-      // Check both the URL type parameter and the session's AMR (authentication method reference)
-      const isRecovery = type === 'recovery' ||
-        data.session?.user?.amr?.some(amr => amr.method === 'recovery');
-
-      if (isRecovery) {
+      if (type === 'recovery') {
         return NextResponse.redirect(`${origin}/reset-password`);
       }
       return NextResponse.redirect(`${origin}${next}`);
