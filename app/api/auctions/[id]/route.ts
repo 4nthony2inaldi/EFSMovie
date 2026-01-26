@@ -2,6 +2,136 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const supabase = await createClient();
+    const auctionId = params.id;
+    const body = await request.json();
+    const { status: newStatus } = body;
+
+    if (!newStatus) {
+      return NextResponse.json({ error: 'Status is required' }, { status: 400 });
+    }
+
+    // Check if user is logged in
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Get auction with current status and verify commissioner
+    const { data: auction, error: auctionError } = await supabase
+      .from('auctions')
+      .select('id, status, league:leagues!inner(id, commissioner_user_id)')
+      .eq('id', auctionId)
+      .single();
+
+    if (auctionError || !auction) {
+      return NextResponse.json({ error: 'Auction not found' }, { status: 404 });
+    }
+
+    const league = auction.league as unknown as { id: string; commissioner_user_id: string };
+    if (league.commissioner_user_id !== user.id) {
+      return NextResponse.json({ error: 'Only the commissioner can update auctions' }, { status: 403 });
+    }
+
+    const oldStatus = auction.status;
+
+    // If changing FROM resolved to another status, we need to clean up assignments
+    if (oldStatus === 'resolved' && newStatus !== 'resolved') {
+      const adminSupabase = createAdminClient();
+
+      // Get team_movies to refund budgets
+      const { data: teamMovies, error: teamMoviesQueryError } = await adminSupabase
+        .from('team_movies')
+        .select('team_id, winning_bid')
+        .eq('auction_id', auctionId);
+
+      if (teamMoviesQueryError) {
+        console.error('Error querying team_movies:', teamMoviesQueryError);
+        return NextResponse.json({ error: `Failed to query team movies: ${teamMoviesQueryError.message}` }, { status: 500 });
+      }
+
+      console.log(`Unresolving auction ${auctionId}: found ${teamMovies?.length || 0} team_movies to refund`);
+
+      // Refund budgets for won movies
+      for (const tm of teamMovies || []) {
+        const { data: team, error: teamError } = await adminSupabase
+          .from('teams')
+          .select('budget_remaining')
+          .eq('id', tm.team_id)
+          .single();
+
+        if (teamError) {
+          console.error('Error fetching team for refund:', teamError);
+          continue;
+        }
+
+        if (team) {
+          const { error: updateError } = await adminSupabase
+            .from('teams')
+            .update({ budget_remaining: Number(team.budget_remaining) + Number(tm.winning_bid) })
+            .eq('id', tm.team_id);
+
+          if (updateError) {
+            console.error('Error refunding budget:', updateError);
+          }
+        }
+      }
+
+      // Delete team_movies for this auction
+      const { error: teamMoviesError } = await adminSupabase
+        .from('team_movies')
+        .delete()
+        .eq('auction_id', auctionId);
+
+      if (teamMoviesError) {
+        console.error('Failed to delete team_movies:', teamMoviesError);
+        return NextResponse.json({ error: `Failed to delete team movies: ${teamMoviesError.message}` }, { status: 500 });
+      }
+
+      // Delete standings_snapshots for this auction
+      const { error: snapshotsError } = await adminSupabase
+        .from('standings_snapshots')
+        .delete()
+        .eq('auction_id', auctionId);
+
+      if (snapshotsError) {
+        console.error('Failed to delete standings_snapshots:', snapshotsError);
+        // Non-fatal, continue
+      }
+
+      console.log(`Auction ${auctionId} unresolved: refunded budgets and deleted assignments`);
+    }
+
+    // Update the auction status
+    const { error: updateError } = await supabase
+      .from('auctions')
+      .update({ status: newStatus })
+      .eq('id', auctionId);
+
+    if (updateError) {
+      return NextResponse.json({ error: `Failed to update status: ${updateError.message}` }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      oldStatus,
+      newStatus,
+      unresolved: oldStatus === 'resolved' && newStatus !== 'resolved'
+    });
+  } catch (error) {
+    console.error('Unexpected error updating auction:', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unexpected server error' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }

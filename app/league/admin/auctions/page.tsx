@@ -190,6 +190,10 @@ export default function LeagueAuctionsPage() {
   }
 
   async function handleStatusChange(id: string, newStatus: string) {
+    // Get current auction to check status
+    const currentAuction = auctions.find(a => a.id === id);
+    const oldStatus = currentAuction?.status;
+
     // If resolving, call the resolve API which processes bids and assigns winners
     if (newStatus === 'resolved') {
       if (!confirm('Resolve this auction? This will process all bids and assign movies to winning teams.')) {
@@ -213,7 +217,34 @@ export default function LeagueAuctionsPage() {
         return;
       }
     } else {
-      await supabase.from('auctions').update({ status: newStatus }).eq('id', id);
+      // If changing FROM resolved, warn about unassigning movies
+      if (oldStatus === 'resolved') {
+        if (!confirm('Unresolve this auction? This will unassign all movies and refund the winning bids back to teams.')) {
+          return;
+        }
+      }
+
+      // Use the PATCH endpoint which handles cleanup when unresolving
+      try {
+        const response = await fetch(`/api/auctions/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus }),
+        });
+        const data = await response.json();
+
+        if (!response.ok) {
+          alert(`Failed to update status: ${data.error}`);
+          return;
+        }
+
+        if (data.unresolved) {
+          alert('Auction unresolved. Movie assignments have been removed and budgets refunded.');
+        }
+      } catch (error) {
+        alert('Failed to update auction status');
+        return;
+      }
     }
     loadData();
   }
