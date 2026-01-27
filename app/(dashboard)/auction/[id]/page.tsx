@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, Fragment } from 'react';
+import { useEffect, useState, useCallback, Fragment, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -63,6 +63,8 @@ export default function AuctionDetailPage({
   const [showTmdbBrowser, setShowTmdbBrowser] = useState(false);
   const [showMobilePriority, setShowMobilePriority] = useState(false);
   const [expandedBids, setExpandedBids] = useState<Set<string>>(new Set());
+  const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
+  const [resultsView, setResultsView] = useState<'by-movie' | 'by-team'>('by-movie');
   const [existingTmdbIds, setExistingTmdbIds] = useState<number[]>([]);
   const [userAddedCount, setUserAddedCount] = useState(0);
   const [userAddedMovieIds, setUserAddedMovieIds] = useState<Set<string>>(new Set());
@@ -517,7 +519,36 @@ export default function AuctionDetailPage({
           </CardContent>
         </Card>
 
-        {/* Results Table */}
+        {/* View Toggle */}
+        <div className="flex items-center gap-2 mb-4">
+          <button
+            onClick={() => setResultsView('by-movie')}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors",
+              resultsView === 'by-movie'
+                ? "bg-purple-600 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            )}
+          >
+            <Film className="h-4 w-4" />
+            By Movie
+          </button>
+          <button
+            onClick={() => setResultsView('by-team')}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors",
+              resultsView === 'by-team'
+                ? "bg-purple-600 text-white"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            )}
+          >
+            <Users className="h-4 w-4" />
+            By Team
+          </button>
+        </div>
+
+        {/* Results Table - By Movie View */}
+        {resultsView === 'by-movie' && (
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -708,6 +739,17 @@ export default function AuctionDetailPage({
             </div>
           </CardContent>
         </Card>
+        )}
+
+        {/* Results Table - By Team View */}
+        {resultsView === 'by-team' && (
+          <TeamBidsView
+            results={results}
+            expandedTeams={expandedTeams}
+            setExpandedTeams={setExpandedTeams}
+            currentTeamId={currentTeam?.id}
+          />
+        )}
       </>
     );
   }
@@ -1222,5 +1264,266 @@ function BidRow({
         )}
       </div>
     </div>
+  );
+}
+
+// Team-centric view of auction results
+function TeamBidsView({
+  results,
+  expandedTeams,
+  setExpandedTeams,
+  currentTeamId,
+}: {
+  results: any[];
+  expandedTeams: Set<string>;
+  setExpandedTeams: React.Dispatch<React.SetStateAction<Set<string>>>;
+  currentTeamId?: string;
+}) {
+  // Build team-centric data from results
+  const teamData = useMemo(() => {
+    const teams = new Map<string, {
+      id: string;
+      name: string;
+      bids: Array<{
+        movie: Movie;
+        amount: number;
+        priority: number | null;
+        won: boolean;
+        winningBid: number;
+      }>;
+      moviesWon: number;
+      totalSpent: number;
+      totalBid: number;
+    }>();
+
+    // Process each result to build team data
+    results.forEach((result) => {
+      // Process all bids for this movie
+      result.all_bids?.forEach((bid: any) => {
+        if (!teams.has(bid.team_id)) {
+          teams.set(bid.team_id, {
+            id: bid.team_id,
+            name: bid.team_name,
+            bids: [],
+            moviesWon: 0,
+            totalSpent: 0,
+            totalBid: 0,
+          });
+        }
+
+        const teamEntry = teams.get(bid.team_id)!;
+        const won = result.winner?.id === bid.team_id;
+
+        teamEntry.bids.push({
+          movie: result.movie,
+          amount: bid.amount,
+          priority: bid.priority,
+          won,
+          winningBid: result.winning_bid,
+        });
+
+        teamEntry.totalBid += bid.amount;
+        if (won) {
+          teamEntry.moviesWon++;
+          teamEntry.totalSpent += result.winning_bid;
+        }
+      });
+    });
+
+    // Sort bids by priority for each team
+    teams.forEach((team) => {
+      team.bids.sort((a, b) => {
+        // Won movies first
+        if (a.won !== b.won) return a.won ? -1 : 1;
+        // Then by priority (lower is higher priority)
+        const aPriority = a.priority ?? Infinity;
+        const bPriority = b.priority ?? Infinity;
+        if (aPriority !== bPriority) return aPriority - bPriority;
+        // Then by amount (higher first)
+        return b.amount - a.amount;
+      });
+    });
+
+    // Convert to array and sort by movies won, then total spent
+    return Array.from(teams.values()).sort((a, b) => {
+      if (b.moviesWon !== a.moviesWon) return b.moviesWon - a.moviesWon;
+      return b.totalSpent - a.totalSpent;
+    });
+  }, [results]);
+
+  const toggleTeam = (teamId: string) => {
+    setExpandedTeams((prev) => {
+      const next = new Set(prev);
+      if (next.has(teamId)) {
+        next.delete(teamId);
+      } else {
+        next.add(teamId);
+      }
+      return next;
+    });
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200 bg-gray-50">
+                <th className="w-10 p-4"></th>
+                <th className="text-left p-4 font-semibold text-gray-900">Team</th>
+                <th className="text-center p-4 font-semibold text-gray-900">Bids Placed</th>
+                <th className="text-center p-4 font-semibold text-gray-900">Movies Won</th>
+                <th className="text-right p-4 font-semibold text-gray-900">Total Bid</th>
+                <th className="text-right p-4 font-semibold text-gray-900">Total Spent</th>
+              </tr>
+            </thead>
+            <tbody>
+              {teamData.map((team) => {
+                const isExpanded = expandedTeams.has(team.id);
+                const isCurrentTeam = team.id === currentTeamId;
+                return (
+                  <Fragment key={team.id}>
+                    <tr
+                      className={cn(
+                        "border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors",
+                        isExpanded && "bg-purple-50/50",
+                        isCurrentTeam && "bg-purple-50/30"
+                      )}
+                      onClick={() => toggleTeam(team.id)}
+                    >
+                      <td className="p-4">
+                        <button
+                          className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                          onClick={(e) => { e.stopPropagation(); toggleTeam(team.id); }}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </button>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/teams/${team.id}`}
+                            className="font-medium text-gray-900 hover:text-purple-600"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {team.name}
+                          </Link>
+                          {isCurrentTeam && (
+                            <Badge variant="purple" className="text-xs">You</Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className="font-medium text-gray-700">{team.bids.length}</span>
+                      </td>
+                      <td className="p-4 text-center">
+                        <span className={cn(
+                          "font-medium",
+                          team.moviesWon > 0 ? "text-green-600" : "text-gray-500"
+                        )}>
+                          {team.moviesWon}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right">
+                        <span className="text-gray-600">{formatCurrency(team.totalBid)}</span>
+                      </td>
+                      <td className="p-4 text-right">
+                        <span className="font-medium text-purple-600">{formatCurrency(team.totalSpent)}</span>
+                      </td>
+                    </tr>
+                    {/* Expanded bid details */}
+                    {isExpanded && (
+                      <tr key={`${team.id}-bids`} className="bg-purple-50/30">
+                        <td colSpan={6} className="px-4 pb-4 pt-0">
+                          <div className="ml-10 bg-white rounded-lg border border-purple-200 p-4">
+                            <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                              <ListOrdered className="h-4 w-4 text-purple-600" />
+                              {team.name}&apos;s Bids ({team.bids.length})
+                            </h4>
+                            <div className="space-y-2">
+                              {team.bids.map((bid, index) => (
+                                <div
+                                  key={bid.movie.id}
+                                  className={cn(
+                                    "flex items-center justify-between py-2 px-3 rounded-lg text-sm",
+                                    bid.won
+                                      ? "bg-green-50 border border-green-200"
+                                      : "bg-gray-50"
+                                  )}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    {bid.priority !== null && bid.priority !== undefined ? (
+                                      <span className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 text-xs font-medium flex items-center justify-center">
+                                        {bid.priority + 1}
+                                      </span>
+                                    ) : (
+                                      <span className="w-6 h-6 rounded-full bg-gray-100 text-gray-500 text-xs font-medium flex items-center justify-center">
+                                        -
+                                      </span>
+                                    )}
+                                    {bid.movie.poster_url ? (
+                                      <img
+                                        src={bid.movie.poster_url}
+                                        alt={bid.movie.title}
+                                        className="w-8 h-12 object-cover rounded"
+                                      />
+                                    ) : (
+                                      <div className="w-8 h-12 bg-gray-200 rounded flex items-center justify-center">
+                                        <Film className="h-3 w-3 text-gray-400" />
+                                      </div>
+                                    )}
+                                    <div>
+                                      <Link
+                                        href={`/movies/${bid.movie.id}`}
+                                        className={cn(
+                                          "font-medium hover:text-purple-600",
+                                          bid.won ? "text-green-700" : "text-gray-700"
+                                        )}
+                                      >
+                                        {bid.movie.title}
+                                      </Link>
+                                      {bid.won && (
+                                        <div className="flex items-center gap-1 text-xs text-green-600">
+                                          <Trophy className="h-3 w-3" />
+                                          Won
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-4 text-right">
+                                    <div>
+                                      <div className={cn(
+                                        "font-semibold",
+                                        bid.won ? "text-green-700" : "text-gray-900"
+                                      )}>
+                                        {formatCurrency(bid.amount)}
+                                      </div>
+                                      {!bid.won && bid.winningBid > 0 && (
+                                        <div className="text-xs text-gray-500">
+                                          Won at {formatCurrency(bid.winningBid)}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
