@@ -57,7 +57,7 @@ export default function AdminUsersPage() {
     }
 
     // Get unique user IDs and fetch user details from the lookup endpoint
-    const userIds = [...new Set(teams?.map(t => t.user_id) || [])];
+    const userIds = Array.from(new Set(teams?.map(t => t.user_id) || []));
 
     // Group teams by user_id
     const teamsByUser = (teams || []).reduce((acc, team) => {
