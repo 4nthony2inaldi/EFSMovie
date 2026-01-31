@@ -1,18 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Get the redirect URL from query params (used for invite links)
+  const nextUrl = searchParams.get('next');
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,7 +46,16 @@ export default function LoginPage() {
 
       if (!teams || teams.length === 0) {
         // No team yet, need to complete onboarding
-        router.push('/onboarding');
+        // Preserve any redirect URL (e.g., for invite links)
+        router.push(nextUrl || '/onboarding');
+        router.refresh();
+        return;
+      }
+
+      // User has teams - if there's a next URL with an invite, redirect there
+      // This handles existing users clicking invite links
+      if (nextUrl) {
+        router.push(nextUrl);
         router.refresh();
         return;
       }

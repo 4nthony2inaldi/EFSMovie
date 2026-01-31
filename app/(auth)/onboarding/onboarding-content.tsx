@@ -42,7 +42,13 @@ export function OnboardingContent() {
     async function checkAuth() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        router.push('/login');
+        // Preserve invite code when redirecting to login
+        const code = searchParams.get('invite');
+        if (code) {
+          router.push(`/login?next=/onboarding?invite=${encodeURIComponent(code)}`);
+        } else {
+          router.push('/login');
+        }
         return;
       }
 
@@ -55,8 +61,15 @@ export function OnboardingContent() {
         .limit(1);
 
       if (existingTeams && existingTeams.length > 0) {
-        // Already onboarded, go to standings
-        router.push('/standings');
+        // User already has teams - redirect to join page if they have an invite code
+        // This allows existing users to join additional leagues via invite
+        const code = searchParams.get('invite');
+        if (code) {
+          router.push(`/leagues/join?invite=${encodeURIComponent(code)}`);
+        } else {
+          // Already onboarded, go to standings
+          router.push('/standings');
+        }
         return;
       }
 
@@ -71,7 +84,7 @@ export function OnboardingContent() {
     }
 
     checkAuth();
-  }, [supabase, router]);
+  }, [supabase, router, searchParams]);
 
   async function handleCreateLeague() {
     if (!userId || !teamName.trim() || !leagueName.trim()) return;

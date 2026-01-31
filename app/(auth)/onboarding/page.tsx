@@ -4,11 +4,21 @@ import { Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { OnboardingContent } from './onboarding-content';
 
-export default async function OnboardingPage() {
+interface OnboardingPageProps {
+  searchParams: Promise<{ invite?: string }>;
+}
+
+export default async function OnboardingPage({ searchParams }: OnboardingPageProps) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  const params = await searchParams;
+  const inviteCode = params.invite;
 
   if (!user) {
+    // Preserve invite code when redirecting to login
+    if (inviteCode) {
+      redirect(`/login?next=/onboarding?invite=${encodeURIComponent(inviteCode)}`);
+    }
     redirect('/login');
   }
 
@@ -20,7 +30,12 @@ export default async function OnboardingPage() {
     .limit(1);
 
   if (existingTeams && existingTeams.length > 0) {
-    // User already has a team, redirect to standings
+    // User already has a team - redirect to join page if they have an invite code
+    // This allows existing users to join additional leagues via invite
+    if (inviteCode) {
+      redirect(`/leagues/join?invite=${encodeURIComponent(inviteCode)}`);
+    }
+    // Otherwise, redirect to standings
     redirect('/standings');
   }
 
