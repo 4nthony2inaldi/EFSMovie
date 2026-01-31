@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Search, ArrowRight, Loader2, Check, X } from 'lucide-react';
+import { Users, Search, ArrowRight, Loader2, Check, X, Key, Copy, Eye, EyeOff } from 'lucide-react';
 
 interface Team {
   id: string;
@@ -44,6 +44,14 @@ export default function AdminTeamsPage() {
   const [moveLoading, setMoveLoading] = useState(false);
   const [moveError, setMoveError] = useState<string | null>(null);
   const [moveSuccess, setMoveSuccess] = useState<string | null>(null);
+
+  // Reset password state
+  const [resettingTeamId, setResettingTeamId] = useState<string | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetSuccess, setResetSuccess] = useState<{ teamId: string; password: string } | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -114,6 +122,53 @@ export default function AdminTeamsPage() {
     setMoveLoading(false);
   }
 
+  async function handleResetPassword() {
+    if (!resettingTeamId) return;
+
+    const team = teams.find(t => t.id === resettingTeamId);
+    if (!team) return;
+
+    setResetLoading(true);
+    setResetError(null);
+    setResetSuccess(null);
+
+    try {
+      const response = await fetch('/api/admin/reset-user-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: team.user_id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setResetError(data.error || 'Failed to reset password');
+      } else {
+        setResetSuccess({ teamId: resettingTeamId, password: data.temporaryPassword });
+      }
+    } catch (error) {
+      setResetError('Network error - please try again');
+    }
+
+    setResetLoading(false);
+  }
+
+  function handleCopyPassword() {
+    if (resetSuccess?.password) {
+      navigator.clipboard.writeText(resetSuccess.password);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  function handleCloseReset() {
+    setResettingTeamId(null);
+    setResetError(null);
+    setResetSuccess(null);
+    setShowPassword(false);
+    setCopied(false);
+  }
+
   const filteredTeams = teams.filter((team) => {
     const matchesSearch = team.name.toLowerCase().includes(search.toLowerCase());
     const matchesLeague = !filterLeague || team.league_id === filterLeague;
@@ -146,6 +201,55 @@ export default function AdminTeamsPage() {
         <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
           <X className="h-5 w-5" />
           {moveError}
+        </div>
+      )}
+
+      {/* Reset Password Success Message with Password */}
+      {resetSuccess && (
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center gap-2 text-green-700 mb-3">
+            <Check className="h-5 w-5" />
+            <span className="font-medium">Temporary password generated!</span>
+          </div>
+          <p className="text-sm text-green-600 mb-3">
+            Share this password with the user. They will be required to change it on their next login.
+          </p>
+          <p className="text-sm text-gray-500 mb-3">
+            Team: <span className="font-medium">{teams.find(t => t.id === resetSuccess.teamId)?.name}</span>
+          </p>
+          <div className="flex items-center gap-2 bg-white rounded-lg border border-green-200 p-3">
+            <code className="flex-1 font-mono text-lg">
+              {showPassword ? resetSuccess.password : '••••••••••••'}
+            </code>
+            <button
+              onClick={() => setShowPassword(!showPassword)}
+              className="p-2 text-gray-500 hover:text-gray-700"
+              title={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+            <button
+              onClick={handleCopyPassword}
+              className="p-2 text-gray-500 hover:text-gray-700"
+              title="Copy password"
+            >
+              {copied ? <Check className="h-5 w-5 text-green-600" /> : <Copy className="h-5 w-5" />}
+            </button>
+          </div>
+          <button
+            onClick={handleCloseReset}
+            className="mt-3 text-sm text-green-700 hover:text-green-800 font-medium"
+          >
+            Done
+          </button>
+        </div>
+      )}
+
+      {/* Reset Password Error Message */}
+      {resetError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
+          <X className="h-5 w-5" />
+          {resetError}
         </div>
       )}
 
@@ -230,6 +334,43 @@ export default function AdminTeamsPage() {
         </Card>
       )}
 
+      {/* Reset Password Confirmation Dialog */}
+      {resettingTeamId && !resetSuccess && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Key className="h-5 w-5 text-amber-600" />
+              Generate Temporary Password
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-600 mb-4">
+              This will generate a new temporary password for the user who owns this team. They will be required to change it after logging in.
+            </p>
+            <p className="text-sm text-gray-500 mb-4">
+              Team: <span className="font-medium">{teams.find(t => t.id === resettingTeamId)?.name}</span>
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleResetPassword}
+                disabled={resetLoading}
+                className="btn-primary flex items-center gap-2"
+              >
+                {resetLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                Generate Password
+              </button>
+              <button
+                onClick={handleCloseReset}
+                className="btn-secondary"
+                disabled={resetLoading}
+              >
+                Cancel
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Teams List */}
       <Card>
         <CardHeader>
@@ -257,7 +398,7 @@ export default function AdminTeamsPage() {
                     <tr
                       key={team.id}
                       className={`border-b border-gray-100 ${
-                        movingTeamId === team.id ? 'bg-purple-50' : ''
+                        movingTeamId === team.id ? 'bg-purple-50' : resettingTeamId === team.id ? 'bg-amber-50' : ''
                       }`}
                     >
                       <td className="p-4">
@@ -273,17 +414,30 @@ export default function AdminTeamsPage() {
                         {new Date(team.created_at).toLocaleDateString()}
                       </td>
                       <td className="p-4 text-right">
-                        <button
-                          onClick={() => {
-                            setMovingTeamId(team.id);
-                            setTargetLeagueId('');
-                            setMoveError(null);
-                            setMoveSuccess(null);
-                          }}
-                          className="text-sm text-purple-600 hover:text-purple-700 font-medium"
-                        >
-                          Move to League
-                        </button>
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            onClick={() => {
+                              setResettingTeamId(team.id);
+                              setResetError(null);
+                              setResetSuccess(null);
+                            }}
+                            className="text-sm text-amber-600 hover:text-amber-700 font-medium flex items-center gap-1"
+                          >
+                            <Key className="h-4 w-4" />
+                            Reset Password
+                          </button>
+                          <button
+                            onClick={() => {
+                              setMovingTeamId(team.id);
+                              setTargetLeagueId('');
+                              setMoveError(null);
+                              setMoveSuccess(null);
+                            }}
+                            className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                          >
+                            Move to League
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
