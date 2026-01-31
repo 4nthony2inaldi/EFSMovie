@@ -84,12 +84,17 @@ export default function LeagueAuctionsPage() {
     if (!leagueId) return;
     setSaving(true);
 
+    // Convert datetime-local values (which are local time) to proper ISO strings
+    // datetime-local gives us "2026-01-31T12:30" which we parse as local time
+    const opensAtLocal = new Date(formData.opens_at);
+    const closesAtLocal = new Date(formData.closes_at);
+
     const auctionData = {
       league_id: leagueId,
       for_month: formData.for_month,
       for_year: formData.for_year,
-      opens_at: formData.opens_at,
-      closes_at: formData.closes_at,
+      opens_at: opensAtLocal.toISOString(),
+      closes_at: closesAtLocal.toISOString(),
       status: 'upcoming',
     };
 
@@ -140,12 +145,24 @@ export default function LeagueAuctionsPage() {
     setSelectedMovies([]);
   }
 
+  // Convert a UTC date string to a datetime-local input format (local time)
+  function toDatetimeLocal(utcDateStr: string): string {
+    const date = new Date(utcDateStr);
+    // Format as YYYY-MM-DDTHH:MM for datetime-local input (in local timezone)
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  }
+
   async function startEdit(auction: Auction) {
     setFormData({
       for_month: auction.for_month,
       for_year: auction.for_year,
-      opens_at: auction.opens_at.slice(0, 16),
-      closes_at: auction.closes_at.slice(0, 16),
+      opens_at: toDatetimeLocal(auction.opens_at),
+      closes_at: toDatetimeLocal(auction.closes_at),
     });
     setEditingId(auction.id);
 
