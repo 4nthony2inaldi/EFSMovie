@@ -39,6 +39,7 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const passwordJustChanged = useRef(false);
 
   useEffect(() => {
     async function loadData() {
@@ -49,8 +50,9 @@ export default function SettingsPage() {
       }
       setUser(user);
 
-      // Check if user must change their password
-      if (user.user_metadata?.must_change_password || searchParams.get('change_password') === 'required') {
+      // Check if user must change their password (but skip if we just changed it)
+      if (!passwordJustChanged.current &&
+          (user.user_metadata?.must_change_password || searchParams.get('change_password') === 'required')) {
         setMustChangePassword(true);
       }
 
@@ -120,6 +122,12 @@ export default function SettingsPage() {
     if (updateError) {
       setError(updateError.message);
     } else {
+      // Mark that password was just changed to prevent useEffect from re-setting the flag
+      passwordJustChanged.current = true;
+
+      // Refresh the session to ensure the updated metadata is propagated
+      await supabase.auth.refreshSession();
+
       setSuccess(true);
       setMustChangePassword(false);
       setCurrentPassword('');
