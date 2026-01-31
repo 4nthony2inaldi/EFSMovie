@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import {
   ShieldCheck,
   Users,
+  UserCog,
   Trophy,
   Home,
   LayoutDashboard,
@@ -58,6 +59,9 @@ export default async function SiteAdminLayout({
             </NavLink>
             <NavLink href="/admin/teams" icon={<Users className="h-4 w-4" />}>
               Teams
+            </NavLink>
+            <NavLink href="/admin/users" icon={<UserCog className="h-4 w-4" />}>
+              Users
             </NavLink>
           </div>
         </div>

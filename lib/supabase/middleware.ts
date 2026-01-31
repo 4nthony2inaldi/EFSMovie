@@ -79,5 +79,15 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
+  // Check if user must change their password (temporary password was set by admin)
+  const isSettingsPage = request.nextUrl.pathname.startsWith('/settings');
+  const isApiRoute = request.nextUrl.pathname.startsWith('/api');
+  if (user && user.user_metadata?.must_change_password && !isSettingsPage && !isAuthPage && !isApiRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/settings';
+    url.searchParams.set('change_password', 'required');
+    return NextResponse.redirect(url);
+  }
+
   return supabaseResponse;
 }

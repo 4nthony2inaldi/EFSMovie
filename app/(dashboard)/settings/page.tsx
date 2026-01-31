@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Header } from '@/components/layout/header';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -21,6 +21,7 @@ import { useLeague } from '@/contexts/league-context';
 
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const { currentTeam, currentLeague, refreshTeams } = useLeague();
 
@@ -28,6 +29,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
 
   const [user, setUser] = useState<any>(null);
   const [team, setTeam] = useState<any>(null);
@@ -47,6 +49,11 @@ export default function SettingsPage() {
       }
       setUser(user);
 
+      // Check if user must change their password
+      if (user.user_metadata?.must_change_password || searchParams.get('change_password') === 'required') {
+        setMustChangePassword(true);
+      }
+
       // Use current team from context
       if (currentTeam) {
         setTeam(currentTeam);
@@ -57,7 +64,7 @@ export default function SettingsPage() {
     }
 
     loadData();
-  }, [supabase, router, currentTeam]);
+  }, [supabase, router, currentTeam, searchParams]);
 
   async function handleUpdateTeam(e: React.FormEvent) {
     e.preventDefault();
@@ -104,17 +111,24 @@ export default function SettingsPage() {
 
     setSaving(true);
 
+    // Update password and clear the must_change_password flag
     const { error: updateError } = await supabase.auth.updateUser({
       password: newPassword,
+      data: { must_change_password: false },
     });
 
     if (updateError) {
       setError(updateError.message);
     } else {
       setSuccess(true);
+      setMustChangePassword(false);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      // Remove the query parameter
+      if (searchParams.get('change_password')) {
+        router.replace('/settings');
+      }
       setTimeout(() => setSuccess(false), 3000);
     }
 
@@ -204,6 +218,19 @@ export default function SettingsPage() {
       <Header title="Settings" subtitle="Manage your account and team" />
 
       <div className="max-w-2xl space-y-6">
+        {/* Password Change Required Banner */}
+        {mustChangePassword && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg">
+            <div className="flex items-center gap-2 font-medium">
+              <Lock className="h-5 w-5" />
+              Password Change Required
+            </div>
+            <p className="mt-1 text-sm">
+              You are using a temporary password. Please create a new password below to continue using the app.
+            </p>
+          </div>
+        )}
+
         {/* Success/Error Messages */}
         {success && (
           <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center gap-2">
