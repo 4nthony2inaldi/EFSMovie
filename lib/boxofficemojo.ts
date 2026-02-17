@@ -123,10 +123,11 @@ export async function scrapeBoxOfficeData(imdbId: string): Promise<BoxOfficeData
     // Approach 1: Direct "X,XXX theaters" pattern (handles "3,506 theaters")
     const theaterMatches = html.match(/([\d,]+)\s*theaters?/gi);
     if (theaterMatches) {
+      // Allow limited releases with as few as 1 theater
       const counts = theaterMatches.map(m => {
         const numMatch = m.match(/([\d,]+)/);
         return numMatch ? parseNumber(numMatch[1]) : 0;
-      }).filter(n => n >= 100 && n < 10000); // Lower threshold to 100
+      }).filter(n => n >= 1 && n < 10000);
 
       if (counts.length > 0) {
         data.widest_release = Math.max(...counts);
@@ -141,7 +142,8 @@ export async function scrapeBoxOfficeData(imdbId: string): Promise<BoxOfficeData
       const widestMatch = html.match(/Widest\s*Release[^>]*>([^<]*<[^>]*>)*([\d,]+)/i);
       if (widestMatch) {
         const num = parseNumber(widestMatch[2] || widestMatch[1]);
-        if (num >= 100 && num < 10000) {
+        // Allow limited releases with as few as 1 theater
+        if (num >= 1 && num < 10000) {
           data.widest_release = num;
           data.theater_count = num;
           console.log(`Found theater count (pattern 2 - Widest): ${num}`);
@@ -153,10 +155,11 @@ export async function scrapeBoxOfficeData(imdbId: string): Promise<BoxOfficeData
     if (!data.theater_count) {
       const broadMatch = html.match(/(\d{1},?\d{3})\s*(?:<[^>]*>)*\s*theaters?/gi);
       if (broadMatch) {
+        // Allow limited releases with as few as 1 theater
         const counts = broadMatch.map(m => {
           const numMatch = m.match(/(\d[\d,]*)/);
           return numMatch ? parseNumber(numMatch[1]) : 0;
-        }).filter(n => n >= 100 && n < 10000);
+        }).filter(n => n >= 1 && n < 10000);
 
         if (counts.length > 0) {
           data.widest_release = Math.max(...counts);

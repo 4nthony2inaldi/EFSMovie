@@ -151,6 +151,7 @@ async function scrapeBOMYearlyChart(title: string, year: number): Promise<{ thea
         if (cells) {
           let theaters = 0;
           let boxOffice = 0;
+          let foundFirstGross = false;
 
           for (let i = 0; i < cells.length; i++) {
             // Remove HTML tags to get cell content
@@ -162,11 +163,13 @@ async function scrapeBOMYearlyChart(title: string, year: number): Promise<{ thea
               if (amount > boxOffice) {
                 boxOffice = amount;
               }
+              foundFirstGross = true;
             }
-            // Check for theater count (plain number between 100-5000)
-            else if (/^[\d,]+$/.test(content)) {
+            // Check for theater count - must be after first gross column to avoid picking up rank
+            // Theater count is between 1-5000 (allowing limited releases with few theaters)
+            else if (foundFirstGross && /^[\d,]+$/.test(content)) {
               const num = parseNumber(content);
-              if (num >= 100 && num <= 5000) {
+              if (num >= 1 && num <= 5000 && theaters === 0) {
                 console.log(`Found theater count in yearly chart: ${num}`);
                 theaters = num;
               }
@@ -225,7 +228,8 @@ async function scrapeTheNumbers(title: string, year: number): Promise<{ theaters
     const theaterMatch = html.match(/>([\d,]+)\s*theaters?</i);
     if (theaterMatch) {
       const num = parseNumber(theaterMatch[1]);
-      if (num >= 100 && num < 10000) {
+      // Allow limited releases with as few as 1 theater
+      if (num >= 1 && num < 10000) {
         theaters = num;
         console.log(`The Numbers found theaters: ${theaters}`);
       }
@@ -235,7 +239,8 @@ async function scrapeTheNumbers(title: string, year: number): Promise<{ theaters
     const maxTheatersMatch = html.match(/(?:Maximum|Widest)[^<]*<[^>]*>([\d,]+)/i);
     if (maxTheatersMatch && !theaters) {
       const num = parseNumber(maxTheatersMatch[1]);
-      if (num >= 100 && num < 10000) {
+      // Allow limited releases with as few as 1 theater
+      if (num >= 1 && num < 10000) {
         theaters = num;
         console.log(`The Numbers found max theaters: ${theaters}`);
       }
@@ -329,10 +334,11 @@ async function scrapeBOMEnhanced(imdbId: string): Promise<BrowserScrapeResult | 
     const allTheaterMatches = html.match(/([\d,]+)\s*theaters?/gi);
     if (allTheaterMatches) {
       console.log(`BOM theater patterns found: ${allTheaterMatches.join(', ')}`);
+      // Allow limited releases with as few as 1 theater
       const counts = allTheaterMatches.map(m => {
         const numMatch = m.match(/([\d,]+)/);
         return numMatch ? parseNumber(numMatch[1]) : 0;
-      }).filter(n => n >= 100 && n < 10000);
+      }).filter(n => n >= 1 && n < 10000);
 
       if (counts.length > 0) {
         result.widest_release = Math.max(...counts);
