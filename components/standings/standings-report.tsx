@@ -34,7 +34,7 @@ export function StandingsReport({ standings, leagueName, seasonYear }: Standings
 
   return (
     <div className="fixed inset-0 z-50 overflow-auto bg-black/50 flex items-start justify-center p-4">
-      <div className="relative w-full max-w-4xl my-8">
+      <div className="relative w-full max-w-[375px] my-8">
         {/* Close button */}
         <button
           onClick={() => setIsOpen(false)}
@@ -43,107 +43,99 @@ export function StandingsReport({ standings, leagueName, seasonYear }: Standings
           <X className="h-5 w-5 text-gray-600" />
         </button>
 
-        {/* Report content - screenshot this part */}
+        {/* Report content - optimized for iPhone screenshot */}
         <div id="standings-report" className="bg-white rounded-xl shadow-2xl overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-5 text-white">
-            <h1 className="text-2xl font-bold">{leagueName}</h1>
-            <p className="text-purple-100 mt-1">{seasonYear} Season Standings</p>
+          {/* Compact Header */}
+          <div className="bg-gradient-to-r from-purple-600 to-purple-700 px-4 py-3 text-white">
+            <h1 className="text-lg font-bold leading-tight">{leagueName}</h1>
+            <p className="text-purple-200 text-xs">{seasonYear} Season Standings</p>
           </div>
 
-          {/* Standings */}
-          <div className="p-6">
-            <div className="space-y-4">
-              {standings.map((team, index) => (
-                <div
-                  key={team.team_id}
-                  className={cn(
-                    'rounded-lg border-2 overflow-hidden',
-                    index === 0 ? 'border-gold-400 bg-gold-50' :
-                    index === 1 ? 'border-gray-300 bg-gray-50' :
-                    index === 2 ? 'border-amber-400 bg-amber-50' :
-                    'border-gray-200 bg-white'
-                  )}
-                >
-                  {/* Team header */}
-                  <div className={cn(
-                    'px-4 py-3 flex items-center gap-3',
-                    index === 0 ? 'bg-gold-100' :
-                    index === 1 ? 'bg-gray-100' :
-                    index === 2 ? 'bg-amber-100' :
-                    'bg-gray-50'
-                  )}>
-                    <div className={cn(
-                      'w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm',
-                      index === 0 ? 'bg-gold-500 text-gold-900' :
-                      index === 1 ? 'bg-gray-400 text-white' :
-                      index === 2 ? 'bg-amber-500 text-amber-900' :
-                      'bg-gray-300 text-gray-700'
-                    )}>
-                      {index === 0 ? <Trophy className="h-4 w-4" /> :
-                       index === 1 ? <Medal className="h-4 w-4" /> :
-                       index === 2 ? <Award className="h-4 w-4" /> :
-                       team.rank}
+          {/* Compact Standings List */}
+          <div className="p-3">
+            <div className="space-y-2">
+              {standings.map((team, index) => {
+                const RankIcon = index === 0 ? Trophy : index === 1 ? Medal : index === 2 ? Award : null;
+
+                return (
+                  <div
+                    key={team.team_id}
+                    className={cn(
+                      'rounded-lg border overflow-hidden',
+                      index === 0 ? 'border-gold-300 bg-gold-50' :
+                      index === 1 ? 'border-gray-300 bg-gray-50' :
+                      index === 2 ? 'border-amber-300 bg-amber-50' :
+                      'border-gray-200 bg-white'
+                    )}
+                  >
+                    {/* Team row */}
+                    <div className="px-3 py-2 flex items-center gap-2">
+                      {/* Rank */}
+                      <div className={cn(
+                        'w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0',
+                        index === 0 ? 'bg-gold-400 text-gold-900' :
+                        index === 1 ? 'bg-gray-400 text-white' :
+                        index === 2 ? 'bg-amber-400 text-amber-900' :
+                        'bg-gray-200 text-gray-600'
+                      )}>
+                        {RankIcon ? <RankIcon className="h-3 w-3" /> : team.rank}
+                      </div>
+
+                      {/* Team name */}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm truncate">{team.team_name}</p>
+                      </div>
+
+                      {/* Points */}
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-lg font-bold text-purple-600 leading-none">{formatScore(team.total_points)}</p>
+                        <p className="text-[10px] text-gray-400">pts</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-gray-900 truncate">{team.team_name}</h3>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-purple-600">{formatScore(team.total_points)}</p>
-                      <p className="text-xs text-gray-500">points</p>
-                    </div>
+
+                    {/* Movies - compact inline list */}
+                    {team.movies.length > 0 && (
+                      <div className="px-3 pb-2 flex flex-wrap gap-1">
+                        {team.movies.map((entry) => {
+                          const movie = entry.movie;
+                          const scoreTier = getScoreTier(movie.calculated_score);
+                          const tierColors = {
+                            gold: 'bg-gold-200 text-gold-800',
+                            purple: 'bg-purple-200 text-purple-800',
+                            white: 'bg-gray-200 text-gray-700',
+                            gray: 'bg-gray-100 text-gray-500',
+                          };
+
+                          return (
+                            <span
+                              key={entry.id}
+                              className={cn(
+                                'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium',
+                                tierColors[scoreTier]
+                              )}
+                            >
+                              <span className="truncate max-w-[80px]">{movie.title}</span>
+                              <span className="font-bold">{formatScore(movie.calculated_score)}</span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-
-                  {/* Movies */}
-                  {team.movies.length > 0 && (
-                    <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                      {team.movies.map((entry) => {
-                        const movie = entry.movie;
-                        const scoreTier = getScoreTier(movie.calculated_score);
-                        const tierColors = {
-                          gold: 'bg-gold-100 text-gold-800 border-gold-200',
-                          purple: 'bg-purple-100 text-purple-800 border-purple-200',
-                          white: 'bg-gray-100 text-gray-700 border-gray-200',
-                          gray: 'bg-gray-50 text-gray-500 border-gray-100',
-                        };
-
-                        return (
-                          <div
-                            key={entry.id}
-                            className={cn(
-                              'px-2 py-1.5 rounded border text-xs',
-                              tierColors[scoreTier]
-                            )}
-                          >
-                            <p className="font-medium truncate" title={movie.title}>
-                              {movie.title}
-                            </p>
-                            <p className="font-bold">{formatScore(movie.calculated_score)} pts</p>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {team.movies.length === 0 && (
-                    <div className="px-4 py-3 text-sm text-gray-400 italic">
-                      No movies yet
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
 
-            {/* Footer */}
-            <div className="mt-6 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
-              Generated from Fantasy Movie League
+            {/* Compact Footer */}
+            <div className="mt-3 pt-2 border-t border-gray-100 text-center text-[10px] text-gray-400">
+              Fantasy Movie League
             </div>
           </div>
         </div>
 
         {/* Instructions */}
-        <div className="mt-4 text-center text-white text-sm">
-          <p>Take a screenshot of the report above to share with your league!</p>
+        <div className="mt-3 text-center text-white text-xs">
+          <p>Screenshot the report above to share!</p>
         </div>
       </div>
     </div>
