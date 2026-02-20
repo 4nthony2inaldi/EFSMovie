@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getCurrentTeam } from '@/lib/get-current-team';
 import { Header } from '@/components/layout/header';
 import { StandingsTable } from '@/components/standings/standings-table';
+import { StandingsReport } from '@/components/standings/standings-report';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Trophy, Users, Gavel, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -117,6 +118,13 @@ export default async function StandingsPage() {
       <Header
         title="Standings"
         subtitle={`${league?.name} - ${league?.season_year} Season`}
+        action={
+          <StandingsReport
+            standings={standingsWithMovies}
+            leagueName={league?.name || 'League'}
+            seasonYear={league?.season_year || new Date().getFullYear()}
+          />
+        }
       />
 
       {/* Active Auction Banner */}
