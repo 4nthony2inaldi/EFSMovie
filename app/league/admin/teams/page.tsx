@@ -6,7 +6,7 @@ import { useLeague } from '@/contexts/league-context';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
-import { Users, Loader2, Trash2, UserX, X, Check, Pencil, DollarSign } from 'lucide-react';
+import { Users, Loader2, Trash2, UserX, X, Check, Pencil, DollarSign, ChevronDown, ChevronUp, Film, Plus } from 'lucide-react';
 
 interface Team {
   id: string;
@@ -14,6 +14,21 @@ interface Team {
   user_id: string;
   budget_remaining: number;
   created_at: string;
+}
+
+interface Movie {
+  id: string;
+  title: string;
+  release_month: number;
+  release_year: number;
+  calculated_score: number;
+}
+
+interface TeamMovie {
+  id: string;
+  movie_id: string;
+  winning_bid: number;
+  movie: Movie;
 }
 
 export default function LeagueTeamsPage() {
@@ -29,8 +44,18 @@ export default function LeagueTeamsPage() {
   const [editingBudgetValue, setEditingBudgetValue] = useState<string>('');
   const [savingBudget, setSavingBudget] = useState(false);
 
+  // Roster management state
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null);
+  const [teamMovies, setTeamMovies] = useState<Map<string, TeamMovie[]>>(new Map());
+  const [allMovies, setAllMovies] = useState<Movie[]>([]);
+  const [loadingRoster, setLoadingRoster] = useState<string | null>(null);
+  const [addingMovie, setAddingMovie] = useState(false);
+  const [removingMovieId, setRemovingMovieId] = useState<string | null>(null);
+  const [selectedMovieId, setSelectedMovieId] = useState<string>('');
+
   useEffect(() => {
     loadTeams();
+    loadAllMovies();
   }, [currentTeam?.league_id]);
 
   async function loadTeams() {
@@ -48,6 +73,106 @@ export default function LeagueTeamsPage() {
 
     setTeams(data || []);
     setLoading(false);
+  }
+
+  async function loadAllMovies() {
+    const { data } = await supabase
+      .from('movies')
+      .select('id, title, release_month, release_year, calculated_score')
+      .order('title', { ascending: true });
+
+    setAllMovies(data || []);
+  }
+
+  async function loadTeamMovies(teamId: string) {
+    setLoadingRoster(teamId);
+
+    const { data } = await supabase
+      .from('team_movies')
+      .select(`
+        id,
+        movie_id,
+        winning_bid,
+        movie:movies(id, title, release_month, release_year, calculated_score)
+      `)
+      .eq('team_id', teamId)
+      .order('winning_bid', { ascending: false });
+
+    const movies = (data || []).map(tm => ({
+      ...tm,
+      movie: tm.movie as unknown as Movie
+    }));
+
+    setTeamMovies(prev => new Map(prev).set(teamId, movies));
+    setLoadingRoster(null);
+  }
+
+  async function toggleRoster(teamId: string) {
+    if (expandedTeamId === teamId) {
+      setExpandedTeamId(null);
+    } else {
+      setExpandedTeamId(teamId);
+      if (!teamMovies.has(teamId)) {
+        await loadTeamMovies(teamId);
+      }
+    }
+  }
+
+  async function handleAddMovie(teamId: string) {
+    if (!selectedMovieId) return;
+
+    setAddingMovie(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/admin/add-team-movie', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId, movieId: selectedMovieId, winningBid: 0 }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error || 'Failed to add movie');
+        setAddingMovie(false);
+        return;
+      }
+
+      setSelectedMovieId('');
+      await loadTeamMovies(teamId);
+      setAddingMovie(false);
+    } catch (err) {
+      setError('Network error: Failed to add movie');
+      setAddingMovie(false);
+    }
+  }
+
+  async function handleRemoveMovie(teamId: string, movieId: string) {
+    setRemovingMovieId(movieId);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/admin/remove-team-movie', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId, movieId }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setError(result.error || 'Failed to remove movie');
+        setRemovingMovieId(null);
+        return;
+      }
+
+      await loadTeamMovies(teamId);
+      setRemovingMovieId(null);
+    } catch (err) {
+      setError('Network error: Failed to remove movie');
+      setRemovingMovieId(null);
+    }
   }
 
   async function handleRemoveTeam(teamId: string) {
@@ -122,6 +247,13 @@ export default function LeagueTeamsPage() {
     }
   }
 
+  // Get movies that the team doesn't already own
+  function getAvailableMovies(teamId: string): Movie[] {
+    const owned = teamMovies.get(teamId) || [];
+    const ownedIds = new Set(owned.map(tm => tm.movie_id));
+    return allMovies.filter(m => !ownedIds.has(m.id));
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -155,21 +287,13 @@ export default function LeagueTeamsPage() {
               <p className="text-sm mt-1">Invite players to join your league</p>
             </div>
           ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left p-4 font-semibold">#</th>
-                  <th className="text-left p-4 font-semibold">Team</th>
-                  <th className="text-left p-4 font-semibold">Budget</th>
-                  <th className="text-left p-4 font-semibold">Joined</th>
-                  <th className="text-right p-4 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {teams.map((team, index) => (
-                  <tr key={team.id} className="border-b border-gray-100">
-                    <td className="p-4 text-gray-500">{index + 1}</td>
-                    <td className="p-4">
+            <div className="divide-y divide-gray-100">
+              {teams.map((team, index) => (
+                <div key={team.id}>
+                  {/* Team row */}
+                  <div className="flex items-center p-4 hover:bg-gray-50">
+                    <div className="w-8 text-gray-500">{index + 1}</div>
+                    <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
                           <span className="text-purple-600 font-bold text-sm">
@@ -178,8 +302,8 @@ export default function LeagueTeamsPage() {
                         </div>
                         <span className="font-medium">{team.name}</span>
                       </div>
-                    </td>
-                    <td className="p-4">
+                    </div>
+                    <div className="w-32">
                       {editingBudgetTeamId === team.id ? (
                         <div className="flex items-center gap-1">
                           <div className="relative">
@@ -190,7 +314,7 @@ export default function LeagueTeamsPage() {
                               step="0.01"
                               value={editingBudgetValue}
                               onChange={(e) => setEditingBudgetValue(e.target.value)}
-                              className="w-24 pl-5 pr-2 py-1 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              className="w-20 pl-5 pr-2 py-1 border border-gray-300 rounded text-right text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
                               autoFocus
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') saveBudget(team.id);
@@ -233,14 +357,30 @@ export default function LeagueTeamsPage() {
                           </button>
                         </div>
                       )}
-                    </td>
-                    <td className="p-4 text-gray-600">
+                    </div>
+                    <div className="w-28 text-gray-600 text-sm">
                       {new Date(team.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="p-4 text-right">
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {/* Roster toggle button */}
+                      <button
+                        onClick={() => toggleRoster(team.id)}
+                        className="flex items-center gap-1 px-2 py-1 text-sm text-purple-600 hover:bg-purple-50 rounded transition-colors"
+                        title="Manage roster"
+                      >
+                        <Film className="h-4 w-4" />
+                        <span>Roster</span>
+                        {expandedTeamId === team.id ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
+                      </button>
+
+                      {/* Remove team button */}
                       {confirmingTeamId === team.id ? (
-                        <div className="flex items-center justify-end gap-1">
-                          <span className="text-xs text-gray-500 mr-1">Remove?</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-gray-500">Remove?</span>
                           <button
                             onClick={() => handleRemoveTeam(team.id)}
                             disabled={removingTeamId === team.id}
@@ -274,11 +414,92 @@ export default function LeagueTeamsPage() {
                           <UserX className="h-4 w-4" />
                         </button>
                       )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  </div>
+
+                  {/* Expanded roster section */}
+                  {expandedTeamId === team.id && (
+                    <div className="px-4 pb-4 bg-gray-50 border-t border-gray-100">
+                      {loadingRoster === team.id ? (
+                        <div className="py-4 text-center">
+                          <Loader2 className="h-5 w-5 animate-spin mx-auto text-purple-600" />
+                        </div>
+                      ) : (
+                        <div className="pt-4">
+                          {/* Add movie section */}
+                          <div className="flex items-center gap-2 mb-4">
+                            <select
+                              value={selectedMovieId}
+                              onChange={(e) => setSelectedMovieId(e.target.value)}
+                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                            >
+                              <option value="">Select a movie to add...</option>
+                              {getAvailableMovies(team.id).map(movie => (
+                                <option key={movie.id} value={movie.id}>
+                                  {movie.title} ({movie.release_month}/{movie.release_year})
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => handleAddMovie(team.id)}
+                              disabled={!selectedMovieId || addingMovie}
+                              className="flex items-center gap-1 px-3 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {addingMovie ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Plus className="h-4 w-4" />
+                              )}
+                              Add
+                            </button>
+                          </div>
+
+                          {/* Current movies */}
+                          <div className="space-y-2">
+                            <h4 className="text-sm font-medium text-gray-700">
+                              Current Movies ({teamMovies.get(team.id)?.length || 0})
+                            </h4>
+                            {(teamMovies.get(team.id) || []).length === 0 ? (
+                              <p className="text-sm text-gray-500 italic">No movies on roster</p>
+                            ) : (
+                              <div className="grid gap-2">
+                                {(teamMovies.get(team.id) || []).map(tm => (
+                                  <div
+                                    key={tm.id}
+                                    className="flex items-center justify-between bg-white rounded-lg border border-gray-200 px-3 py-2"
+                                  >
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-gray-900 truncate">{tm.movie.title}</p>
+                                      <p className="text-xs text-gray-500">
+                                        {tm.movie.release_month}/{tm.movie.release_year} •
+                                        Score: {tm.movie.calculated_score.toFixed(2)} •
+                                        Bid: {formatCurrency(tm.winning_bid)}
+                                      </p>
+                                    </div>
+                                    <button
+                                      onClick={() => handleRemoveMovie(team.id, tm.movie_id)}
+                                      disabled={removingMovieId === tm.movie_id}
+                                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                                      title="Remove from roster"
+                                    >
+                                      {removingMovieId === tm.movie_id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="h-4 w-4" />
+                                      )}
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
