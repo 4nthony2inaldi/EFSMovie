@@ -409,7 +409,28 @@ export default function LeagueMoviesPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Are you sure you want to delete this movie?')) return;
+    // Check if any team owns this movie
+    const { data: teamMovies } = await supabase
+      .from('team_movies')
+      .select('team:teams(name)')
+      .eq('movie_id', id);
+
+    if (teamMovies && teamMovies.length > 0) {
+      const teamNames = teamMovies
+        .map((tm) => (tm.team as unknown as { name: string } | null)?.name)
+        .filter(Boolean)
+        .join(', ');
+
+      const confirmed = confirm(
+        `WARNING: This movie is owned by: ${teamNames}\n\n` +
+        `Deleting it will remove it from their roster and they will lose all points from this movie.\n\n` +
+        `Are you sure you want to delete this movie?`
+      );
+      if (!confirmed) return;
+    } else {
+      if (!confirm('Are you sure you want to delete this movie?')) return;
+    }
+
     await supabase.from('movies').delete().eq('id', id);
     loadMovies();
   }
@@ -423,6 +444,13 @@ export default function LeagueMoviesPage() {
       alert('No movies to delete with current filters');
       return;
     }
+
+    // Check if any of these movies are owned by teams
+    const movieIds = moviesToDelete.map(m => m.id);
+    const { data: teamMovies } = await supabase
+      .from('team_movies')
+      .select('movie_id, team:teams(name)')
+      .in('movie_id', movieIds);
 
     // Build a descriptive message based on active filters
     const filterDescriptions: string[] = [];
@@ -440,12 +468,26 @@ export default function LeagueMoviesPage() {
       ? ` (${filterDescriptions.join(', ')})`
       : ' (ALL movies)';
 
-    if (!confirm(`Are you sure you want to delete ${count} movies${filterText}? This cannot be undone.`)) return;
+    let confirmMessage = `Are you sure you want to delete ${count} movies${filterText}? This cannot be undone.`;
+
+    // Add warning about team-owned movies
+    if (teamMovies && teamMovies.length > 0) {
+      const uniqueTeams = new Set(
+        teamMovies
+          .map((tm) => (tm.team as unknown as { name: string } | null)?.name)
+          .filter(Boolean)
+      );
+      const teamList = Array.from(uniqueTeams).join(', ');
+      confirmMessage = `WARNING: ${teamMovies.length} of these movies are owned by teams!\n\n` +
+        `Affected teams: ${teamList}\n\n` +
+        `Deleting will remove these movies from their rosters and they will lose all points.\n\n` +
+        confirmMessage;
+    }
+
+    if (!confirm(confirmMessage)) return;
 
     setBulkDeleting(true);
 
-    // Delete only the filtered movies by their IDs
-    const movieIds = moviesToDelete.map(m => m.id);
     const { error } = await supabase
       .from('movies')
       .delete()
