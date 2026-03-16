@@ -248,6 +248,21 @@ class TMDBClient {
     if (!companies) return [];
     return companies.map((c) => c.name);
   }
+
+  // Get release dates for a movie (for debugging release type issues)
+  async getReleaseDates(movieId: number): Promise<{
+    results: Array<{
+      iso_3166_1: string;
+      release_dates: Array<{
+        certification: string;
+        release_date: string;
+        type: number; // 1=Premiere, 2=Theatrical (limited), 3=Theatrical, 4=Digital, 5=Physical, 6=TV
+        note: string;
+      }>;
+    }>;
+  }> {
+    return this.fetch(`/movie/${movieId}/release_dates`);
+  }
 }
 
 export const tmdb = new TMDBClient();
