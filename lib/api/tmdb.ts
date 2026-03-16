@@ -140,13 +140,17 @@ export function getTrailerUrl(videos?: TMDBMovieDetails['videos']): string | nul
  * Convert TMDB movie to our movie format
  */
 export function convertTMDBMovie(tmdb: TMDBMovieDetails) {
-  const releaseDate = tmdb.release_date ? new Date(tmdb.release_date) : null;
+  // Parse date string directly to avoid timezone issues
+  // (new Date("2026-04-01") becomes March 31 in US timezones)
+  const [releaseYear, releaseMonth] = tmdb.release_date
+    ? tmdb.release_date.split('-').map(Number)
+    : [new Date().getFullYear(), 1];
 
   return {
     title: tmdb.title,
     release_date: tmdb.release_date || null,
-    release_month: releaseDate ? releaseDate.getMonth() + 1 : 1,
-    release_year: releaseDate ? releaseDate.getFullYear() : new Date().getFullYear(),
+    release_month: releaseMonth,
+    release_year: releaseYear,
     tmdb_id: tmdb.id,
     imdb_id: tmdb.imdb_id,
     poster_url: getPosterUrl(tmdb.poster_path),

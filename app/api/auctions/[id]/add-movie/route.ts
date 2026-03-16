@@ -115,10 +115,8 @@ export async function POST(
         );
       }
 
-      // Parse release date
-      const releaseDate = new Date(tmdbMovie.release_date);
-      const releaseMonth = releaseDate.getMonth() + 1;
-      const releaseYear = releaseDate.getFullYear();
+      // Parse release date directly from string to avoid timezone issues
+      const [releaseYear, releaseMonth] = tmdbMovie.release_date.split('-').map(Number);
 
       // Get IMDB ID
       const tmdbMovieAny = tmdbMovie as unknown as { external_ids?: { imdb_id?: string }; imdb_id?: string };

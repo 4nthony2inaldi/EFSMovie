@@ -233,12 +233,12 @@ export default function LeagueMoviesPage() {
 
     // Filter out movies where the displayed release date doesn't match the selected month
     // This excludes re-releases that show their original release date
+    // Note: Parse date string directly to avoid timezone issues (new Date("2026-04-01")
+    // becomes March 31 in US timezones because it's parsed as UTC midnight)
     filtered = filtered.filter(movie => {
       if (!movie.release_date) return false;
-      const releaseDate = new Date(movie.release_date);
-      const movieMonth = releaseDate.getMonth() + 1;
-      const movieYear = releaseDate.getFullYear();
-      return movieMonth === tmdbMonth && movieYear === tmdbYear;
+      const [year, month] = movie.release_date.split('-').map(Number);
+      return month === tmdbMonth && year === tmdbYear;
     });
 
     if (limitToTop50) {
@@ -276,10 +276,8 @@ export default function LeagueMoviesPage() {
     setImportingIds((prev) => new Set(prev).add(tmdbMovie.tmdb_id));
 
     try {
-      // Parse release date
-      const releaseDate = new Date(tmdbMovie.release_date);
-      const releaseMonth = releaseDate.getMonth() + 1;
-      const releaseYear = releaseDate.getFullYear();
+      // Parse release date directly from string to avoid timezone issues
+      const [releaseYear, releaseMonth] = tmdbMovie.release_date.split('-').map(Number);
 
       // Fetch full details
       const detailsResponse = await fetch(`/api/tmdb/movie/${tmdbMovie.tmdb_id}`);
@@ -543,10 +541,8 @@ export default function LeagueMoviesPage() {
       try {
         setImportingIds((prev) => new Set(prev).add(tmdbMovie.tmdb_id));
 
-        // Parse release date
-        const releaseDate = new Date(tmdbMovie.release_date);
-        const releaseMonth = releaseDate.getMonth() + 1;
-        const releaseYear = releaseDate.getFullYear();
+        // Parse release date directly from string to avoid timezone issues
+        const [releaseYear, releaseMonth] = tmdbMovie.release_date.split('-').map(Number);
 
         // Fetch full details
         const detailsResponse = await fetch(`/api/tmdb/movie/${tmdbMovie.tmdb_id}`);
