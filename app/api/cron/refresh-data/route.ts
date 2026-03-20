@@ -43,15 +43,59 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabaseAdmin();
 
   try {
-    // Get movies released in the last 90 days that need data refresh
-    // These are most likely to have new/updated box office data
+    // Get movies owned by teams in active leagues that need data refresh
+    // Only update movies that actually affect scoring
     const today = new Date();
     const ninetyDaysAgo = new Date(today);
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
+    // First get active leagues (not frozen)
+    const { data: activeLeagues } = await supabase
+      .from('leagues')
+      .select('id')
+      .eq('status', 'active')
+      .is('scores_frozen_at', null);
+
+    if (!activeLeagues || activeLeagues.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'No active leagues with unfrozen scores',
+        updated: 0,
+      });
+    }
+
+    const leagueIds = activeLeagues.map(l => l.id);
+
+    // Get movies owned by teams in active leagues, released in last 90 days
+    const { data: teamMovies, error: tmError } = await supabase
+      .from('team_movies')
+      .select(`
+        movie_id,
+        team:teams!inner(league_id)
+      `)
+      .in('team.league_id', leagueIds);
+
+    if (tmError) {
+      console.error('Failed to fetch team movies:', tmError);
+      return NextResponse.json({ error: 'Failed to fetch team movies' }, { status: 500 });
+    }
+
+    // Get unique movie IDs
+    const movieIds = [...new Set(teamMovies?.map(tm => tm.movie_id) || [])];
+
+    if (movieIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: 'No team-owned movies to refresh',
+        updated: 0,
+      });
+    }
+
+    // Fetch the actual movie data for owned movies released in last 90 days
     const { data: movies, error } = await supabase
       .from('movies')
       .select('id, title, tmdb_id, release_year, release_month, release_date, imdb_id')
+      .in('id', movieIds)
       .gte('release_date', ninetyDaysAgo.toISOString().split('T')[0])
       .lte('release_date', today.toISOString().split('T')[0])
       .order('release_date', { ascending: false })
