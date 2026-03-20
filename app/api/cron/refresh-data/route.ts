@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get unique movie IDs
-    const movieIds = [...new Set(teamMovies?.map(tm => tm.movie_id) || [])];
+    const movieIds = Array.from(new Set(teamMovies?.map(tm => tm.movie_id) || []));
 
     if (movieIds.length === 0) {
       return NextResponse.json({
