@@ -14,7 +14,7 @@
     },
     {
       "path": "/api/cron/refresh-data",
-      "schedule": "0 12 * * *"
+      "schedule": "0 20 * * *"
     }
   ]
 }

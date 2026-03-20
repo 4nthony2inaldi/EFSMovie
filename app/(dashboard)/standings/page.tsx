@@ -4,7 +4,7 @@ import { Header } from '@/components/layout/header';
 import { StandingsTable } from '@/components/standings/standings-table';
 import { StandingsReport } from '@/components/standings/standings-report';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Trophy, Users, Gavel, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Trophy, Users, Gavel, Clock, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import type { TeamStanding, Movie, TeamMovie, Auction } from '@/types';
 import { getMonthName } from '@/lib/utils';
@@ -38,6 +38,15 @@ export default async function StandingsPage() {
   // Get standings using the database function
   const { data: standings } = await supabase
     .rpc('get_league_standings', { p_league_id: currentTeam.league_id });
+
+  // Get most recent data update timestamp
+  const { data: latestUpdate } = await supabase
+    .from('movies')
+    .select('box_office_updated_at')
+    .not('box_office_updated_at', 'is', null)
+    .order('box_office_updated_at', { ascending: false })
+    .limit(1)
+    .single();
 
   // Get movies for each team
   const { data: teamMovies } = await supabase
@@ -183,7 +192,7 @@ export default async function StandingsPage() {
       )}
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         <QuickStat
           label="Teams"
           value={standings.length.toString()}
@@ -201,6 +210,23 @@ export default async function StandingsPage() {
           value={standingsWithMovies.reduce((sum, t) => sum + t.movies.length, 0).toString()}
         />
       </div>
+
+      {/* Last Updated */}
+      {latestUpdate?.box_office_updated_at && (
+        <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-8">
+          <RefreshCw className="h-3 w-3" />
+          <span>
+            Data last updated: {new Date(latestUpdate.box_office_updated_at).toLocaleDateString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              timeZone: 'America/New_York',
+            })} EST
+          </span>
+        </div>
+      )}
 
       {/* Standings Grid */}
       <StandingsTable standings={standingsWithMovies} />
