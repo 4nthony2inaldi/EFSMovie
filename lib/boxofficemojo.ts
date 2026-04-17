@@ -67,27 +67,16 @@ export async function scrapeBoxOfficeData(imdbId: string): Promise<BoxOfficeData
       scraped_at: new Date().toISOString(),
     };
 
-    // Look for Domestic box office
-    // BOM shows: "DOMESTIC (48.1%)" then "$15,000,000" - we need the dollar amount, not the percentage
-    // Look for dollar amounts that are at least $100,000 (6+ digits)
-    const moneyMatches = html.match(/\$[\d,]+/g);
-    if (moneyMatches) {
-      // Find the largest dollar amount on the page (likely the total gross)
-      const amounts = moneyMatches.map(m => parseMoney(m)).filter(n => n >= 100000);
-      if (amounts.length > 0) {
-        // The domestic box office is usually one of the larger amounts
-        // Sort descending and take a reasonable one (not worldwide which is largest)
-        amounts.sort((a, b) => b - a);
-        // If we have multiple amounts, domestic is often the 2nd or 3rd largest
-        // But for safety, let's look specifically for the domestic section
-        const domesticSection = html.match(/DOMESTIC[^$]*\$([\d,]+)/i);
-        if (domesticSection) {
-          data.domestic_box_office = parseMoney(domesticSection[1]);
-        } else if (amounts.length > 0) {
-          // Fallback to largest reasonable amount
-          data.domestic_box_office = amounts[0];
-        }
-      }
+    // Look for Domestic box office in BOM's performance summary table.
+    // BOM renders it as "Domestic (48.1%)" followed by "$15,000,000" - the
+    // percentage marker is what distinguishes the summary cell from unrelated
+    // appearances of the word "Domestic" (tab labels, nav, etc.).
+    // We intentionally do NOT fall back to the largest dollar amount on the
+    // page: for foreign films, that would be the international or worldwide
+    // gross, which this app must not report as domestic.
+    const domesticSection = html.match(/DOMESTIC[^$(]{0,200}?\(\s*[\d.]+\s*%\s*\)[^$]*?\$([\d,]+)/i);
+    if (domesticSection) {
+      data.domestic_box_office = parseMoney(domesticSection[1]);
     }
 
     // Look for Opening Weekend - BOM shows "Opening" with dollar amount
