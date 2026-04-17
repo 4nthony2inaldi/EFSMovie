@@ -316,8 +316,10 @@ async function scrapeBOMEnhanced(imdbId: string): Promise<BrowserScrapeResult | 
       release_scale: null,
     };
 
-    // Extract domestic box office - this IS in static HTML
-    const domesticMatch = html.match(/DOMESTIC[^$]*\$([\d,]+)/i);
+    // Extract domestic box office from BOM's performance summary table.
+    // We anchor on the "(xx.x%)" marker so we only pick up the summary cell
+    // (never a tab label, nav link, or the international/worldwide gross).
+    const domesticMatch = html.match(/DOMESTIC[^$(]{0,200}?\(\s*[\d.]+\s*%\s*\)[^$]*?\$([\d,]+)/i);
     if (domesticMatch) {
       result.domestic_box_office = parseMoney(domesticMatch[1]);
       console.log(`BOM found domestic: $${result.domestic_box_office}`);

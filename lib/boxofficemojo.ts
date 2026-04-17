@@ -67,41 +67,16 @@ export async function scrapeBoxOfficeData(imdbId: string): Promise<BoxOfficeData
       scraped_at: new Date().toISOString(),
     };
 
-    // Look for Domestic box office
-    // BOM structure: "DOMESTIC (48.1%)" followed by "$15,000,000"
-    // OR "DOMESTIC (–)" with "–" below when there's no domestic data
-    // We need to be careful not to pick up INTERNATIONAL or WORLDWIDE numbers
-
-    // First check if domestic exists (not just a dash)
-    const domesticDashCheck = html.match(/DOMESTIC\s*\([^)]*\)\s*<[^>]*>\s*[\-–—]/i);
-    if (domesticDashCheck) {
-      // Domestic shows a dash, meaning no domestic box office
-      console.log('BOM shows no domestic box office (dash)');
-      data.domestic_box_office = 0;
-    } else {
-      // Look for DOMESTIC with a percentage, then find the dollar amount nearby
-      // The pattern should match: DOMESTIC (XX.X%) ... $XXX,XXX
-      // But NOT match across INTERNATIONAL section
-      const domesticWithPercent = html.match(/DOMESTIC\s*\(\s*[\d.]+%?\s*\)[^I]*?\$([\d,]+)/i);
-      if (domesticWithPercent) {
-        data.domestic_box_office = parseMoney(domesticWithPercent[1]);
-        console.log(`Found domestic box office with percentage: $${data.domestic_box_office}`);
-      } else {
-        // Alternative: look for domestic in a more structured way
-        // Match DOMESTIC followed by dollar amount within 200 chars, before hitting INTERNATIONAL
-        const domesticSection = html.match(/DOMESTIC[^I]{0,200}\$([\d,]+)/i);
-        if (domesticSection) {
-          // Verify this isn't after a dash indicating no data
-          const beforeDollar = html.substring(
-            html.indexOf('DOMESTIC'),
-            html.indexOf(domesticSection[0]) + domesticSection[0].length
-          );
-          if (!beforeDollar.match(/>\s*[\-–—]\s*</)) {
-            data.domestic_box_office = parseMoney(domesticSection[1]);
-            console.log(`Found domestic box office (alt pattern): $${data.domestic_box_office}`);
-          }
-        }
-      }
+    // Look for Domestic box office in BOM's performance summary table.
+    // BOM renders it as "Domestic (48.1%)" followed by "$15,000,000" - the
+    // percentage marker is what distinguishes the summary cell from unrelated
+    // appearances of the word "Domestic" (tab labels, nav, etc.).
+    // We intentionally do NOT fall back to the largest dollar amount on the
+    // page: for foreign films, that would be the international or worldwide
+    // gross, which this app must not report as domestic.
+    const domesticSection = html.match(/DOMESTIC[^$(]{0,200}?\(\s*[\d.]+\s*%\s*\)[^$]*?\$([\d,]+)/i);
+    if (domesticSection) {
+      data.domestic_box_office = parseMoney(domesticSection[1]);
     }
 
     // Look for Opening Weekend - BOM shows "Opening" with dollar amount
