@@ -399,7 +399,10 @@ export async function scrapeBoxOfficeMojoBrowser(
   }
 
   // 2. Get theater counts from the yearly stats page (static HTML!)
-  // Much simpler than daily pages - one request gets all movies for the year
+  // Much simpler than daily pages - one request gets all movies for the year.
+  // BOM's /year/YYYY/ page is the domestic chart, so its gross columns are
+  // also domestic - safe to use as a fallback when the title page didn't
+  // expose a "Domestic (xx.x%)" summary row.
   if (title && year) {
     console.log('Trying BOM yearly chart for theater counts...');
     const yearlyData = await scrapeBOMYearlyChart(title, year);
@@ -407,6 +410,10 @@ export async function scrapeBoxOfficeMojoBrowser(
       result.theater_count = yearlyData.theaters;
       result.widest_release = yearlyData.theaters;
       console.log(`Got theaters from BOM yearly chart: ${yearlyData.theaters}`);
+    }
+    if (!result.domestic_box_office && yearlyData.boxOffice) {
+      result.domestic_box_office = yearlyData.boxOffice;
+      console.log(`Got domestic box office from BOM yearly chart: $${yearlyData.boxOffice}`);
     }
   }
 
