@@ -285,10 +285,114 @@ async function tryOMDB(imdbId: string): Promise<{ theaters: number | null; boxOf
 }
 
 /**
- * Enhanced Box Office Mojo scraper
- * Note: BOM loads theater data via JavaScript, so this only gets box office
+ * Pull the domestic-release ID (rlXXXXX) out of a BOM title page.
+ * BOM links the domestic release's opening weekend with a ref of `bo_tt_gr`
+ * (no trailing _N), which uniquely identifies it among the territory links.
+ * Falls back to the first releases-table row (which BOM lists Domestic-first).
  */
-async function scrapeBOMEnhanced(imdbId: string): Promise<BrowserScrapeResult | null> {
+function extractDomesticReleaseId(titleHtml: string): string | null {
+  const weekendMatch = titleHtml.match(/\/release\/(rl\d+)\/weekend\?ref_=bo_tt_gr(?![_\d])/);
+  if (weekendMatch) return weekendMatch[1];
+
+  const firstReleaseMatch = titleHtml.match(/\/release\/(rl\d+)\/\?ref_=bo_tt_gr_1/);
+  if (firstReleaseMatch) return firstReleaseMatch[1];
+
+  return null;
+}
+
+/**
+ * Scrape a BOM per-territory release page (`/release/rlXXX/`).
+ * Domestic release pages expose "Widest Release N theaters" and the opening
+ * weekend's theater count in static HTML — the title page does not. This is
+ * the only reliable source of theater counts for limited releases that don't
+ * make BOM's yearly top-200 chart.
+ */
+async function scrapeBOMReleasePage(releaseId: string): Promise<{
+  theater_count: number | null;
+  widest_release: number | null;
+  opening_theaters: number | null;
+  opening_weekend: number | null;
+  domestic_box_office: number | null;
+  release_scale: 'wide' | 'limited' | null;
+}> {
+  const result: {
+    theater_count: number | null;
+    widest_release: number | null;
+    opening_theaters: number | null;
+    opening_weekend: number | null;
+    domestic_box_office: number | null;
+    release_scale: 'wide' | 'limited' | null;
+  } = {
+    theater_count: null,
+    widest_release: null,
+    opening_theaters: null,
+    opening_weekend: null,
+    domestic_box_office: null,
+    release_scale: null,
+  };
+
+  const url = `https://www.boxofficemojo.com/release/${releaseId}/`;
+  console.log(`Fetching BOM release page: ${url}`);
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+
+    if (!response.ok) {
+      console.log(`BOM release page returned ${response.status}`);
+      return result;
+    }
+
+    const html = await response.text();
+    console.log(`BOM release page HTML length: ${html.length}`);
+
+    const widestMatch = html.match(/Widest\s+Release\s*<\/span>\s*<span[^>]*>\s*([\d,]+)\s*theaters?/i);
+    if (widestMatch) {
+      const n = parseNumber(widestMatch[1]);
+      if (n >= 1 && n < 10000) {
+        result.widest_release = n;
+        result.theater_count = n;
+        console.log(`BOM release page: widest_release=${n}`);
+      }
+    }
+
+    const openingMatch = html.match(/>Opening<\/span>[\s\S]{0,400}?\$([\d,]+)[\s\S]{0,200}?([\d,]+)\s*theaters?/i);
+    if (openingMatch) {
+      result.opening_weekend = parseMoney(openingMatch[1]);
+      const n = parseNumber(openingMatch[2]);
+      if (n >= 1 && n < 10000) result.opening_theaters = n;
+      console.log(`BOM release page: opening=$${result.opening_weekend} in ${result.opening_theaters} theaters`);
+    }
+
+    const domesticMatch = html.match(/Domestic\s*\(\s*<span[^>]*>\s*[\d.]+\s*%\s*<\/span>\s*\)[^$]*?\$([\d,]+)/i);
+    if (domesticMatch) {
+      result.domestic_box_office = parseMoney(domesticMatch[1]);
+      console.log(`BOM release page: domestic=$${result.domestic_box_office}`);
+    }
+
+    // BOM classifies a release as Wide once it hits 600+ theaters at its peak.
+    if (result.widest_release !== null) {
+      result.release_scale = result.widest_release >= 600 ? 'wide' : 'limited';
+    }
+
+    return result;
+  } catch (error) {
+    console.error('BOM release page scrape error:', error);
+    return result;
+  }
+}
+
+/**
+ * Enhanced Box Office Mojo scraper
+ * Returns the title-page box office data plus the domestic release ID so a
+ * caller can fetch the per-territory release page for theater counts (which
+ * the title page no longer exposes in static HTML).
+ */
+async function scrapeBOMEnhanced(imdbId: string): Promise<{ result: BrowserScrapeResult; releaseId: string | null } | null> {
   const url = `https://www.boxofficemojo.com/title/${imdbId}/`;
 
   try {
@@ -331,28 +435,14 @@ async function scrapeBOMEnhanced(imdbId: string): Promise<BrowserScrapeResult | 
       result.opening_weekend = parseMoney(openingMatch[1]);
     }
 
-    // Theater counts are loaded via JavaScript on BOM - they won't be in static HTML
-    // Try anyway in case the page structure changes
-    const allTheaterMatches = html.match(/([\d,]+)\s*theaters?/gi);
-    if (allTheaterMatches) {
-      console.log(`BOM theater patterns found: ${allTheaterMatches.join(', ')}`);
-      // Allow limited releases with as few as 1 theater
-      const counts = allTheaterMatches.map(m => {
-        const numMatch = m.match(/([\d,]+)/);
-        return numMatch ? parseNumber(numMatch[1]) : 0;
-      }).filter(n => n >= 1 && n < 10000);
-
-      if (counts.length > 0) {
-        result.widest_release = Math.max(...counts);
-        result.theater_count = result.widest_release;
-        result.opening_theaters = counts[0];
-        console.log(`BOM theater counts: ${counts.join(', ')}, using=${result.widest_release}`);
-      }
+    const releaseId = extractDomesticReleaseId(html);
+    if (releaseId) {
+      console.log(`BOM title page: found domestic release ID ${releaseId}`);
     } else {
-      console.log('BOM: No theater patterns found in static HTML (loaded via JS)');
+      console.log('BOM title page: no domestic release link found');
     }
 
-    return result;
+    return { result, releaseId };
   } catch (error) {
     console.error(`BOM enhanced scrape error for ${imdbId}:`, error);
     return null;
@@ -392,10 +482,35 @@ export async function scrapeBoxOfficeMojoBrowser(
   }
 
   // 1. Get box office data from the movie's title page (this works with static HTML)
-  const bomResult = await scrapeBOMEnhanced(imdbId);
-  if (bomResult) {
-    result.domestic_box_office = bomResult.domestic_box_office;
-    result.opening_weekend = bomResult.opening_weekend;
+  const bomEnhanced = await scrapeBOMEnhanced(imdbId);
+  if (bomEnhanced) {
+    result.domestic_box_office = bomEnhanced.result.domestic_box_office;
+    result.opening_weekend = bomEnhanced.result.opening_weekend;
+  }
+
+  // 1b. Fetch the domestic per-territory release page for authoritative
+  // theater counts (widest release + opening theaters). The title page no
+  // longer exposes these in static HTML, so this is the primary source for
+  // limited releases that don't crack BOM's yearly top-200 chart.
+  if (bomEnhanced?.releaseId) {
+    const releaseData = await scrapeBOMReleasePage(bomEnhanced.releaseId);
+    if (releaseData.theater_count) {
+      result.theater_count = releaseData.theater_count;
+      result.widest_release = releaseData.widest_release;
+      console.log(`Got theaters from BOM release page: ${releaseData.theater_count}`);
+    }
+    if (releaseData.opening_theaters) {
+      result.opening_theaters = releaseData.opening_theaters;
+    }
+    if (releaseData.opening_weekend && !result.opening_weekend) {
+      result.opening_weekend = releaseData.opening_weekend;
+    }
+    if (releaseData.domestic_box_office && !result.domestic_box_office) {
+      result.domestic_box_office = releaseData.domestic_box_office;
+    }
+    if (releaseData.release_scale && !result.release_scale) {
+      result.release_scale = releaseData.release_scale;
+    }
   }
 
   // 2. Get theater counts from the yearly stats page (static HTML!)
@@ -406,7 +521,7 @@ export async function scrapeBoxOfficeMojoBrowser(
   if (title && year) {
     console.log('Trying BOM yearly chart for theater counts...');
     const yearlyData = await scrapeBOMYearlyChart(title, year);
-    if (yearlyData.theaters) {
+    if (yearlyData.theaters && !result.theater_count) {
       result.theater_count = yearlyData.theaters;
       result.widest_release = yearlyData.theaters;
       console.log(`Got theaters from BOM yearly chart: ${yearlyData.theaters}`);
