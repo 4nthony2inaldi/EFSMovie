@@ -184,21 +184,23 @@ export interface MetacriticResult {
 export async function scrapeMetacriticScore(imdbId: string, title: string, year?: number): Promise<MetacriticResult> {
   const slug = toMetacriticSlug(title);
 
-  // Build list of URLs to try - Metacritic sometimes appends the year to the slug
-  const urlsToTry = [
-    `https://www.metacritic.com/movie/${slug}/`,
-  ];
-
-  // Add year variants if we have a year
+  // Metacritic disambiguates same-titled releases by appending the year to the
+  // slug for the newer one (e.g. /movie/moana/ = 2016 original,
+  // /movie/moana-2026/ = 2026 remake). We try year-suffixed URLs first so a
+  // new release is never accidentally matched to an older namesake. When we do
+  // fall back to the plain slug, tryFetchMetacriticScore validates that the
+  // page's datePublished lines up with the expected year before returning a
+  // score.
+  const urlsToTry: string[] = [];
   if (year) {
     urlsToTry.push(`https://www.metacritic.com/movie/${slug}-${year}/`);
-    // Also try previous year (release dates can be off by a year)
     urlsToTry.push(`https://www.metacritic.com/movie/${slug}-${year - 1}/`);
   }
+  urlsToTry.push(`https://www.metacritic.com/movie/${slug}/`);
 
   for (const metacriticUrl of urlsToTry) {
     console.log(`Trying Metacritic URL: ${metacriticUrl}`);
-    const result = await tryFetchMetacriticScore(metacriticUrl, title);
+    const result = await tryFetchMetacriticScore(metacriticUrl, title, year);
     if (result.score !== null) {
       return result;
     }
@@ -209,9 +211,14 @@ export async function scrapeMetacriticScore(imdbId: string, title: string, year?
 }
 
 /**
- * Try to fetch and parse Metacritic score from a specific URL
+ * Try to fetch and parse Metacritic score from a specific URL.
+ *
+ * When `expectedYear` is provided, the parsed JSON-LD's `datePublished` must
+ * be within ±1 year of it. This prevents a title-slug collision (e.g. the
+ * plain /movie/moana/ page belonging to the 2016 original) from returning
+ * the wrong movie's score for a new release.
  */
-async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Promise<MetacriticResult> {
+async function tryFetchMetacriticScore(metacriticUrl: string, title: string, expectedYear?: number): Promise<MetacriticResult> {
 
   try {
     const response = await fetch(metacriticUrl, {
@@ -240,6 +247,17 @@ async function tryFetchMetacriticScore(metacriticUrl: string, title: string): Pr
       try {
         const jsonText = jsonLdMatch[1].trim();
         const jsonData = JSON.parse(jsonText);
+
+        // Only the Movie JSON-LD block carries the aggregateRating for the
+        // actual film (other blocks describe reviews, trailers, etc.), so
+        // the datePublished on this block is what we compare against.
+        if (jsonData['@type'] === 'Movie' && expectedYear && jsonData.datePublished) {
+          const pubYear = parseInt(String(jsonData.datePublished).slice(0, 4), 10);
+          if (Number.isFinite(pubYear) && Math.abs(pubYear - expectedYear) > 1) {
+            console.log(`Rejecting ${metacriticUrl}: page year ${pubYear} does not match expected ${expectedYear} (title: ${title})`);
+            return { score: null, source: null };
+          }
+        }
 
         // Check if this JSON-LD has an aggregateRating
         const rating = jsonData.aggregateRating;
