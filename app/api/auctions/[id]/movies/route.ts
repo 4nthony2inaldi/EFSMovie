@@ -77,18 +77,21 @@ export async function PUT(
     }
     console.log('Successfully deleted existing commissioner-added movies');
 
-    // Add new movies (if any)
+    // Add new movies (if any). Skip rows that already exist for this auction
+    // via the unique (auction_id, movie_id) constraint — those are team-added
+    // rows we left in place above, and re-inserting them as commissioner-added
+    // would violate the constraint.
     if (movie_ids.length > 0) {
-      console.log('Inserting', movie_ids.length, 'movies for auction:', auctionId);
+      console.log('Upserting', movie_ids.length, 'movies for auction:', auctionId);
       const auctionMovies = movie_ids.map((movieId: string) => ({
         auction_id: auctionId,
         movie_id: movieId,
-        added_by_team_id: null, // Commissioner-added movies have null team id
+        added_by_team_id: null,
       }));
 
       const { error: insertError } = await adminSupabase
         .from('auction_movies')
-        .insert(auctionMovies);
+        .upsert(auctionMovies, { onConflict: 'auction_id,movie_id', ignoreDuplicates: true });
 
       if (insertError) {
         console.error('Failed to insert auction movies:', insertError);
@@ -97,7 +100,7 @@ export async function PUT(
           { status: 500 }
         );
       }
-      console.log('Successfully inserted', movie_ids.length, 'movies');
+      console.log('Successfully upserted movies for auction:', auctionId);
     }
 
     return NextResponse.json({
